@@ -14,11 +14,14 @@
     "prisma:status": "prisma migrate status",
     "prisma:validate": "prisma validate",
     "db:smoke": "node ./scripts/db-smoke-check.js",
-    "db:seed": "node ./scripts/seed-dev-data.js"
+    "db:seed": "node ./scripts/seed-dev-data.js",
+    "github:smoke": "node ./scripts/github-smoke-check.js",
+    "github:env": "node ./scripts/print-github-env-template.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "jose": "^5.9.3",
     "next": "16.1.1",
     "pg": "^8.16.3",
     "react": "19.2.3",

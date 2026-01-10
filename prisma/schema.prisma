@@ -115,3 +115,28 @@ model AuditLog {
   note       String?
   metadata   Json?
 }
+
+model GitHubInstallation {
+  id             String       @id @default(cuid())
+  installationId Int          @unique
+  accountLogin   String
+  accountType    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  repos          GitHubRepo[]
+}
+
+model GitHubRepo {
+  id              String             @id @default(cuid())
+  repoId          Int                @unique
+  fullName        String
+  name            String
+  private         Boolean
+  ownerLogin      String
+  selected        Boolean            @default(false)
+  lastSeenAt      DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  installationId  String
+  installation    GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+}

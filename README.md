@@ -1,12 +1,13 @@
 # Ledger (v1 scaffold)
 
-Ledger is an internal AI Ops panel for the social media post pipeline: repo -> brief -> drafts -> approvals -> schedule -> reminders. This v1 scaffold is intentionally simple and read-only; it uses mocked data, a thin local API layer, and no external integrations yet. Ledger does not modify repo contents in this version.
+Ledger is an internal AI Ops panel for the social media post pipeline: repo -> brief -> drafts -> approvals -> schedule -> reminders. This v1 scaffold is intentionally simple and read-only; it uses mocked data, a thin local API layer, and optional GitHub App integration. Ledger does not modify repo contents in this version.
 
 ## V1 scope
 - Read-only internal UI for review workflows: dashboard, inbox, drafts, schedules, tasks, settings
 - In-memory storage with seeded data (default)
 - Thin API routes for approvals, revisions, and task updates
 - Admin token gate for every page and API route
+- Optional GitHub App integration (read-only, installation-based)
 
 ## Local development (mock mode)
 1) Install deps:
@@ -57,12 +58,70 @@ The Prisma schema is included, but DB mode is off by default. Prisma 7 uses a `p
    ```
 4) Start the app as usual.
 
+## Prisma migrate diff (shadow DB)
+Prisma 7 requires a shadow database URL for diff-from-migrations.
+```bash
+createdb ledger_shadow
+```
+Set:
+```
+SHADOW_DATABASE_URL=postgresql://localhost:5432/ledger_shadow
+```
+Then run:
+```bash
+npx prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --script
+```
+
 ## Dev-only seed data
 For local dogfooding you can seed realistic workflow data in DB mode:
 ```bash
 STORAGE_MODE=db NODE_ENV=development npm run db:seed
 ```
 This script is idempotent and will not run in production.
+
+## GitHub App integration (optional)
+Ledger supports a read-only GitHub App connection in DB mode. The app uses installation tokens only; no user PATs are stored.
+
+Required env vars (set in `.env.local`):
+```
+GITHUB_APP_ID=
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+GITHUB_PRIVATE_KEY_PEM=
+GITHUB_APP_SLUG=
+```
+
+To connect:
+1) Ensure `STORAGE_MODE=db` and `DATABASE_URL` are set.
+2) Visit `http://localhost:3000/settings/integrations/github`.
+3) Click "Connect GitHub" to install the app.
+4) After install, select repos and save the selection.
+
+Only selected repos are considered authorized.
+
+Optional smoke check (skips if not configured):
+```bash
+npm run github:smoke
+```
+
+## GitHub App env setup
+- App URL: use the last segment after `/apps/` as the slug.
+  - Example URL: `https://github.com/apps/ledger-read-only`
+  - Slug: `ledger-read-only`
+- Local dev: put secrets in `.env.local` (never commit it).
+- Railway: set the same vars in the service environment.
+
+Recommended PEM formatting (single-line, escaped newlines):
+```
+GITHUB_PRIVATE_KEY_PEM="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Raw multi-line PEM also works if your shell/env loader preserves newlines.
+
+`npm run github:smoke` behavior:
+- SKIP if env vars are missing
+- SKIP if env vars exist but no installation is connected
+- OK if installation token can be generated
 
 ## Scripts
 - `npm run dev`
@@ -75,6 +134,7 @@ This script is idempotent and will not run in production.
 - `npm run prisma:validate`
 - `npm run db:smoke` (read-only DB connectivity check)
 - `npm run db:seed` (dev-only seed data; requires `STORAGE_MODE=db`)
+- `npm run github:smoke` (dev-only GitHub app check; skips if not configured)
 
 ## Deploying to Railway (web service now, worker later)
 - Create a PostgreSQL plugin (future DB mode).
@@ -83,7 +143,7 @@ This script is idempotent and will not run in production.
 - For now, deploy as a web service only. A worker process can be added later.
 
 ## Future steps
-- GitHub OAuth for repo access
+- Expand GitHub App ingestion endpoints (commits/releases/PRs) if needed
 - OpenAI API for draft and schedule generation
 - Background worker for scheduling and reminders
 - SendGrid emails for notifications

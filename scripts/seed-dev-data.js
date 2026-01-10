@@ -39,7 +39,6 @@ const daysAhead = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
 const ids = {
   project: "project-ledger-internal",
-  repo: "repo-ledger-internal",
   brief: "brief-ledger-internal",
   drafts: [
     "draft-ledger-li",
@@ -75,28 +74,6 @@ async function main() {
     },
   });
 
-  await prisma.repoAccess.upsert({
-    where: { id: ids.repo },
-    update: {
-      repo: "jason_marshall/ledger",
-      projectTag: project.tag,
-      enabled: true,
-      triggerDrafts: false,
-      triggerSchedules: false,
-      triggerTasks: false,
-      projectId: project.id,
-    },
-    create: {
-      id: ids.repo,
-      repo: "jason_marshall/ledger",
-      projectTag: project.tag,
-      enabled: true,
-      triggerDrafts: false,
-      triggerSchedules: false,
-      triggerTasks: false,
-      projectId: project.id,
-    },
-  });
 
   await prisma.brief.upsert({
     where: { id: ids.brief },

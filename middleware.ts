@@ -14,7 +14,9 @@ export function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/logout") ||
-    pathname.startsWith("/api/auth")
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/github/install") ||
+    pathname.startsWith("/api/github/callback")
   ) {
     return NextResponse.next();
   }
