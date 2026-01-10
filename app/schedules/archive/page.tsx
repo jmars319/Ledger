@@ -18,6 +18,10 @@ export default async function ScheduleArchivePage({
   const schedules = (await store.listSchedules()).filter(
     (schedule) => schedule.status !== "NEEDS_REVIEW"
   );
+  const statusCounts = schedules.reduce<Record<string, number>>((acc, schedule) => {
+    acc[schedule.status] = (acc[schedule.status] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <PageShell
@@ -33,6 +37,22 @@ export default async function ScheduleArchivePage({
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-3">
+        {Object.entries(statusCounts).length === 0 ? (
+          <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-500">
+            No archived schedules yet
+          </span>
+        ) : (
+          Object.entries(statusCounts).map(([status, count]) => (
+            <span
+              key={status}
+              className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300"
+            >
+              {status}: {count}
+            </span>
+          ))
+        )}
+      </section>
       <section className="grid gap-4">
         {schedules.length === 0 ? (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-500">

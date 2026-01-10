@@ -34,6 +34,14 @@ export default async function InboxArchivePage({
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-3">
+        <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
+          Drafts: {drafts.length}
+        </span>
+        <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
+          Schedules: {schedules.length}
+        </span>
+      </section>
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Drafts</div>

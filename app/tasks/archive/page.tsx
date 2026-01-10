@@ -16,6 +16,8 @@ export default async function TasksArchivePage({
   const token = (await searchParams)?.token;
   const store = getStore();
   const tasks = (await store.listTasks()).filter((task) => task.status !== "PENDING");
+  const doneCount = tasks.filter((task) => task.status === "DONE").length;
+  const skippedCount = tasks.filter((task) => task.status === "SKIPPED").length;
 
   return (
     <PageShell
@@ -31,6 +33,14 @@ export default async function TasksArchivePage({
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-3">
+        <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
+          Done: {doneCount}
+        </span>
+        <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
+          Skipped: {skippedCount}
+        </span>
+      </section>
       <section className="grid gap-4">
         {tasks.length === 0 ? (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-500">

@@ -16,6 +16,10 @@ export default async function DraftArchivePage({
   const token = (await searchParams)?.token;
   const store = getStore();
   const drafts = (await store.listDrafts()).filter((draft) => draft.status !== "NEEDS_REVIEW");
+  const statusCounts = drafts.reduce<Record<string, number>>((acc, draft) => {
+    acc[draft.status] = (acc[draft.status] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <PageShell
@@ -31,6 +35,22 @@ export default async function DraftArchivePage({
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-3">
+        {Object.entries(statusCounts).length === 0 ? (
+          <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-500">
+            No archived drafts yet
+          </span>
+        ) : (
+          Object.entries(statusCounts).map(([status, count]) => (
+            <span
+              key={status}
+              className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300"
+            >
+              {status}: {count}
+            </span>
+          ))
+        )}
+      </section>
       <section className="grid gap-4">
         {drafts.length === 0 ? (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-500">
