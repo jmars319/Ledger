@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
   const store = getStore();
-  const draft = await store.updateDraftStatus(params.id, "APPROVED");
+  const draft = await store.updateDraftStatus(resolvedParams.id, "APPROVED");
   if (!draft) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

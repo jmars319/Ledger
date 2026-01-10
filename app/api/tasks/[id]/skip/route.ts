@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { getStore } from "@/lib/store";
 
-export async function POST(_request: Request, { params }: { params: { id: string } }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params;
   const store = getStore();
-  const task = await store.updateTaskStatus(params.id, "SKIPPED");
+  const task = await store.updateTaskStatus(resolvedParams.id, "SKIPPED");
   if (!task) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
