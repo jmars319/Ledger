@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
@@ -27,6 +28,8 @@ export default async function InboxPage({
     token,
     type: typeFilter === "all" ? undefined : typeFilter,
   });
+  const newDraftLink = withParams("/drafts/new", { token });
+  const manageSchedulesLink = withParams("/schedules/manage", { token });
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
@@ -38,14 +41,31 @@ export default async function InboxPage({
       title="Inbox"
       subtitle="Items waiting for review."
       actions={
-        <Link
-          href={archiveLink}
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
-        >
-          View archive
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={newDraftLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            New draft
+          </Link>
+          <Link
+            href={manageSchedulesLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            New schedule
+          </Link>
+          <Link
+            href={archiveLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            View archive
+          </Link>
+        </div>
       }
     >
+      <PurposeCard>
+        Review drafts and schedule proposals that require a human decision before they move forward.
+      </PurposeCard>
       <section className="flex flex-wrap gap-2">
         {[
           { label: "All", value: "all" },

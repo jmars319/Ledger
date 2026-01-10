@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import TaskActions from "@/app/components/TaskActions";
 import { getStore } from "@/lib/store";
 
@@ -32,6 +33,7 @@ export default async function TasksPage({
     token,
     status: statusFilter === "pending" ? undefined : statusFilter,
   });
+  const manageLink = withParams("/tasks/manage", { token });
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
@@ -43,14 +45,25 @@ export default async function TasksPage({
       title="Manual tasks"
       subtitle="Upcoming items that require manual steps."
       actions={
-        <Link
-          href={archiveLink}
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
-        >
-          View archive
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={manageLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            Manage tasks
+          </Link>
+          <Link
+            href={archiveLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            View archive
+          </Link>
+        </div>
       }
     >
+      <PurposeCard>
+        Track manual tasks that need human completion before posts can proceed.
+      </PurposeCard>
       <section className="flex flex-wrap gap-2">
         {[
           { label: "Pending", value: "pending" },
