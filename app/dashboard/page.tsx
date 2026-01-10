@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
 
 export default async function DashboardPage({
@@ -47,6 +48,9 @@ export default async function DashboardPage({
         </Link>
       }
     >
+      <PurposeCard>
+        A high-level snapshot of review readiness and recent actions across drafts, schedules, and tasks.
+      </PurposeCard>
       <section className="grid gap-4 md:grid-cols-3">
         {[
           { label: "Drafts ready", value: data.counts.draftsReady },

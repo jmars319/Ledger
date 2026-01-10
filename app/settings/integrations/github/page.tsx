@@ -1,4 +1,5 @@
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import GitHubIntegrationClient from "@/app/settings/integrations/github/GitHubIntegrationClient";
 
 export default async function GitHubIntegrationPage({
@@ -14,6 +15,9 @@ export default async function GitHubIntegrationPage({
       title="GitHub integration"
       subtitle="Connect the Ledger GitHub App and select repos."
     >
+      <PurposeCard>
+        Connect the read-only GitHub App, then select which repos Ledger can read.
+      </PurposeCard>
       <GitHubIntegrationClient token={token} />
     </PageShell>
   );

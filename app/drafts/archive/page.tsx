@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
@@ -51,6 +52,9 @@ export default async function DraftArchivePage({
         </Link>
       }
     >
+      <PurposeCard>
+        Browse drafts that are already approved, rejected, or awaiting revision follow-ups.
+      </PurposeCard>
       <section className="flex flex-wrap gap-2">
         {[
           { label: "All", value: "all" },

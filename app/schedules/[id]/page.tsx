@@ -1,5 +1,6 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
+import PurposeCard from "@/app/components/PurposeCard";
 import ReviewActions from "@/app/components/ReviewActions";
 import { getStore } from "@/lib/store";
 import { notFound } from "next/navigation";
@@ -56,6 +57,9 @@ export default async function SchedulePage({
         </div>
       }
     >
+      <PurposeCard>
+        Review a proposed schedule, then approve or request revisions before publishing.
+      </PurposeCard>
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Proposed items</div>
