@@ -38,26 +38,43 @@ All pages and API routes require `ADMIN_TOKEN` and will accept:
 This is a placeholder and easy to replace later.
 
 ## DB mode (optional)
-The Prisma schema is included, but DB mode is off by default.
+The Prisma schema is included, but DB mode is off by default. Prisma 7 uses a `prisma.config.ts` file to load the connection URL instead of `schema.prisma`. The config loads `.env` and `.env.local` so the CLI can find `DATABASE_URL`.
 
 1) Set:
    ```bash
    STORAGE_MODE=db
    DATABASE_URL=postgresql://...
    ```
+   - Local Postgres.app example: `postgresql://localhost:5432/ledger?schema=public`
 2) Run:
    ```bash
    npm run prisma:generate
    npm run prisma:migrate
    ```
-3) Start the app as usual.
+3) (Optional) Smoke check DB connectivity:
+   ```bash
+   npm run db:smoke
+   ```
+4) Start the app as usual.
+
+## Dev-only seed data
+For local dogfooding you can seed realistic workflow data in DB mode:
+```bash
+STORAGE_MODE=db NODE_ENV=development npm run db:seed
+```
+This script is idempotent and will not run in production.
 
 ## Scripts
 - `npm run dev`
+- `npm run dev:turbo` (guarded; only if Turbopack root is safe)
 - `npm run lint`
 - `npm run typecheck`
 - `npm run prisma:generate`
 - `npm run prisma:migrate` (requires `DATABASE_URL` and `STORAGE_MODE=db`)
+- `npm run prisma:status`
+- `npm run prisma:validate`
+- `npm run db:smoke` (read-only DB connectivity check)
+- `npm run db:seed` (dev-only seed data; requires `STORAGE_MODE=db`)
 
 ## Deploying to Railway (web service now, worker later)
 - Create a PostgreSQL plugin (future DB mode).

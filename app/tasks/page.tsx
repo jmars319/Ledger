@@ -1,3 +1,4 @@
+import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import TaskActions from "@/app/components/TaskActions";
 import { getStore } from "@/lib/store";
@@ -9,10 +10,23 @@ export default async function TasksPage({
 }) {
   const token = (await searchParams)?.token;
   const store = getStore();
-  const tasks = await store.listTasks();
+  const tasks = (await store.listTasks()).filter((task) => task.status === "PENDING");
+  const archiveLink = token ? `/tasks/archive?token=${encodeURIComponent(token)}` : "/tasks/archive";
 
   return (
-    <PageShell token={token} title="Manual tasks" subtitle="Upcoming items that require manual steps.">
+    <PageShell
+      token={token}
+      title="Manual tasks"
+      subtitle="Upcoming items that require manual steps."
+      actions={
+        <Link
+          href={archiveLink}
+          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+        >
+          View archive
+        </Link>
+      }
+    >
       <section className="grid gap-4">
         {tasks.map((task: any) => (
           <div

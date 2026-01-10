@@ -241,6 +241,10 @@ export const createMemoryStore = (): StorageAdapter => ({
     };
   },
 
+  async listDrafts() {
+    return data.drafts;
+  },
+
   async getDraft(id: string) {
     return data.drafts.find((draft) => draft.id === id) ?? null;
   },
@@ -262,6 +266,10 @@ export const createMemoryStore = (): StorageAdapter => ({
 
   async getSchedule(id: string) {
     return data.schedules.find((schedule) => schedule.id === id) ?? null;
+  },
+
+  async listSchedules() {
+    return data.schedules;
   },
 
   async updateScheduleStatus(id: string, status: ScheduleStatus, note?: string) {

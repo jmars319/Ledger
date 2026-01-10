@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { getPrismaClient } from "@/lib/prisma";
 import type {
   AuditLog as PrismaAuditLog,
   Draft as PrismaDraft,
@@ -78,6 +78,7 @@ const mapAudit = (audit: PrismaAuditLog): AuditLog => ({
 });
 
 const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
+  const prisma = getPrismaClient();
   await prisma.auditLog.create({
     data: {
       actor: entry.actor,
@@ -92,6 +93,7 @@ const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
 
 export const createDbStore = (): StorageAdapter => ({
   async getDashboard(): Promise<DashboardSummary> {
+    const prisma = getPrismaClient();
     const [draftsReady, schedulesReady, tasksDue, recentAudit] = await Promise.all([
       prisma.draft.count({ where: { status: "NEEDS_REVIEW" } }),
       prisma.scheduleProposal.count({ where: { status: "NEEDS_REVIEW" } }),
@@ -110,6 +112,7 @@ export const createDbStore = (): StorageAdapter => ({
   },
 
   async listInbox(): Promise<InboxSummary> {
+    const prisma = getPrismaClient();
     const [drafts, schedules] = await Promise.all([
       prisma.draft.findMany({ where: { status: "NEEDS_REVIEW" } }),
       prisma.scheduleProposal.findMany({
@@ -124,12 +127,20 @@ export const createDbStore = (): StorageAdapter => ({
     };
   },
 
+  async listDrafts() {
+    const prisma = getPrismaClient();
+    const drafts = await prisma.draft.findMany({ orderBy: { updatedAt: "desc" } });
+    return drafts.map(mapDraft);
+  },
+
   async getDraft(id: string) {
+    const prisma = getPrismaClient();
     const draft = await prisma.draft.findUnique({ where: { id } });
     return draft ? mapDraft(draft) : null;
   },
 
   async updateDraftStatus(id: string, status: DraftStatus, note?: string) {
+    const prisma = getPrismaClient();
     const existing = await prisma.draft.findUnique({ where: { id } });
     if (!existing) return null;
 
@@ -150,6 +161,7 @@ export const createDbStore = (): StorageAdapter => ({
   },
 
   async getSchedule(id: string) {
+    const prisma = getPrismaClient();
     const schedule = await prisma.scheduleProposal.findUnique({
       where: { id },
       include: { items: true },
@@ -157,7 +169,17 @@ export const createDbStore = (): StorageAdapter => ({
     return schedule ? mapSchedule(schedule) : null;
   },
 
+  async listSchedules() {
+    const prisma = getPrismaClient();
+    const schedules = await prisma.scheduleProposal.findMany({
+      include: { items: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    return schedules.map(mapSchedule);
+  },
+
   async updateScheduleStatus(id: string, status: ScheduleStatus, note?: string) {
+    const prisma = getPrismaClient();
     const existing = await prisma.scheduleProposal.findUnique({ where: { id } });
     if (!existing) return null;
 
@@ -179,11 +201,13 @@ export const createDbStore = (): StorageAdapter => ({
   },
 
   async listTasks() {
+    const prisma = getPrismaClient();
     const tasks = await prisma.task.findMany({ orderBy: { dueAt: "asc" } });
     return tasks.map(mapTask);
   },
 
   async updateTaskStatus(id: string, status: TaskStatus) {
+    const prisma = getPrismaClient();
     const existing = await prisma.task.findUnique({ where: { id } });
     if (!existing) return null;
 
@@ -203,11 +227,13 @@ export const createDbStore = (): StorageAdapter => ({
   },
 
   async listRepos() {
+    const prisma = getPrismaClient();
     const repos = await prisma.repoAccess.findMany({ orderBy: { repo: "asc" } });
     return repos.map(mapRepo);
   },
 
   async updateRepos(repos: RepoAccess[]) {
+    const prisma = getPrismaClient();
     // TODO: Replace full reset with targeted upserts once repo lifecycle is defined.
     await prisma.$transaction([
       prisma.repoAccess.deleteMany(),
@@ -234,6 +260,7 @@ export const createDbStore = (): StorageAdapter => ({
   },
 
   async listAuditLogs(limit: number) {
+    const prisma = getPrismaClient();
     const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: limit });
     return logs.map(mapAudit);
   },

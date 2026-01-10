@@ -2,53 +2,42 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import { getStore } from "@/lib/store";
 
-export default async function DashboardPage({
+const withToken = (href: string, token?: string) => {
+  if (!token) return href;
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}token=${encodeURIComponent(token)}`;
+};
+
+export default async function AuditArchivePage({
   searchParams,
 }: {
   searchParams?: Promise<{ token?: string }>;
 }) {
   const token = (await searchParams)?.token;
   const store = getStore();
-  const data = await store.getDashboard();
-  const archiveLink = token ? `/dashboard/audit?token=${encodeURIComponent(token)}` : "/dashboard/audit";
+  const logs = await store.listAuditLogs(200);
 
   return (
     <PageShell
       token={token}
-      title="Dashboard"
-      subtitle="Pipeline snapshot with recent audit activity."
+      title="Audit archive"
+      subtitle="Full audit trail for recent actions."
       actions={
         <Link
-          href={archiveLink}
+          href={withToken("/dashboard", token)}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
         >
-          View audit archive
+          Back to dashboard
         </Link>
       }
     >
-      <section className="grid gap-4 md:grid-cols-3">
-        {[
-          { label: "Drafts ready", value: data.counts.draftsReady },
-          { label: "Schedules ready", value: data.counts.schedulesReady },
-          { label: "Tasks due", value: data.counts.tasksDue },
-        ].map((item) => (
-          <div
-            key={item.label}
-            className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5"
-          >
-            <div className="text-xs uppercase tracking-widest text-slate-500">{item.label}</div>
-            <div className="mt-3 text-3xl font-semibold text-white">{item.value}</div>
-          </div>
-        ))}
-      </section>
-
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-        <div className="text-sm font-semibold text-slate-200">Latest audit logs</div>
+        <div className="text-sm font-semibold text-slate-200">Audit log</div>
         <div className="mt-4 grid gap-3">
-          {data.recentAudit.length === 0 ? (
+          {logs.length === 0 ? (
             <div className="text-sm text-slate-500">No audit activity yet.</div>
           ) : (
-            data.recentAudit.map((entry: any) => (
+            logs.map((entry) => (
               <div
                 key={entry.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300"

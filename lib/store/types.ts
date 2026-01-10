@@ -90,8 +90,10 @@ export type InboxSummary = {
 export type StorageAdapter = {
   getDashboard(): Promise<DashboardSummary>;
   listInbox(): Promise<InboxSummary>;
+  listDrafts(): Promise<Draft[]>;
   getDraft(id: string): Promise<Draft | null>;
   updateDraftStatus(id: string, status: DraftStatus, note?: string): Promise<Draft | null>;
+  listSchedules(): Promise<ScheduleProposal[]>;
   getSchedule(id: string): Promise<ScheduleProposal | null>;
   updateScheduleStatus(id: string, status: ScheduleStatus, note?: string): Promise<ScheduleProposal | null>;
   listTasks(): Promise<Task[]>;

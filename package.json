@@ -10,11 +10,17 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:status": "prisma migrate status",
+    "prisma:validate": "prisma validate",
+    "db:smoke": "node ./scripts/db-smoke-check.js",
+    "db:seed": "node ./scripts/seed-dev-data.js"
   },
   "dependencies": {
-    "@prisma/client": "^5.22.0",
+    "@prisma/adapter-pg": "^7.2.0",
+    "@prisma/client": "^7.2.0",
     "next": "16.1.1",
+    "pg": "^8.16.3",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -23,9 +29,10 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.4.5",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
-    "prisma": "^5.22.0",
+    "prisma": "^7.2.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

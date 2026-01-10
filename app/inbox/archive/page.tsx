@@ -8,27 +8,29 @@ const withToken = (href: string, token?: string) => {
   return `${href}${separator}token=${encodeURIComponent(token)}`;
 };
 
-export default async function InboxPage({
+export default async function InboxArchivePage({
   searchParams,
 }: {
   searchParams?: Promise<{ token?: string }>;
 }) {
   const token = (await searchParams)?.token;
   const store = getStore();
-  const data = await store.listInbox();
-  const archiveLink = token ? `/inbox/archive?token=${encodeURIComponent(token)}` : "/inbox/archive";
+  const drafts = (await store.listDrafts()).filter((draft) => draft.status !== "NEEDS_REVIEW");
+  const schedules = (await store.listSchedules()).filter(
+    (schedule) => schedule.status !== "NEEDS_REVIEW"
+  );
 
   return (
     <PageShell
       token={token}
-      title="Inbox"
-      subtitle="Items waiting for review."
+      title="Inbox archive"
+      subtitle="Reviewed drafts and schedules."
       actions={
         <Link
-          href={archiveLink}
+          href={withToken("/inbox", token)}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
         >
-          View archive
+          Back to inbox
         </Link>
       }
     >
@@ -36,17 +38,17 @@ export default async function InboxPage({
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Drafts</div>
           <div className="mt-4 grid gap-3">
-            {data.drafts.length === 0 ? (
-              <div className="text-sm text-slate-500">No drafts awaiting review.</div>
+            {drafts.length === 0 ? (
+              <div className="text-sm text-slate-500">No reviewed drafts yet.</div>
             ) : (
-              data.drafts.map((draft: any) => (
+              drafts.map((draft) => (
                 <Link
                   key={draft.id}
                   href={withToken(`/drafts/${draft.id}`, token)}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"
                 >
                   <div className="font-semibold text-slate-100">{draft.title}</div>
-                  <div className="text-xs text-slate-500">{draft.platform}</div>
+                  <div className="text-xs text-slate-500">{draft.platform} · {draft.status}</div>
                 </Link>
               ))
             )}
@@ -56,17 +58,17 @@ export default async function InboxPage({
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Schedules</div>
           <div className="mt-4 grid gap-3">
-            {data.schedules.length === 0 ? (
-              <div className="text-sm text-slate-500">No schedules awaiting review.</div>
+            {schedules.length === 0 ? (
+              <div className="text-sm text-slate-500">No reviewed schedules yet.</div>
             ) : (
-              data.schedules.map((schedule: any) => (
+              schedules.map((schedule) => (
                 <Link
                   key={schedule.id}
                   href={withToken(`/schedules/${schedule.id}`, token)}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"
                 >
                   <div className="font-semibold text-slate-100">Schedule proposal</div>
-                  <div className="text-xs text-slate-500">{schedule.items.length} items</div>
+                  <div className="text-xs text-slate-500">{schedule.items.length} items · {schedule.status}</div>
                 </Link>
               ))
             )}

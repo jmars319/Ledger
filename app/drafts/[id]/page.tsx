@@ -1,3 +1,4 @@
+import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import ReviewActions from "@/app/components/ReviewActions";
 import { getStore } from "@/lib/store";
@@ -19,9 +20,22 @@ export default async function DraftPage({
   if (!draft) {
     notFound();
   }
+  const archiveLink = token ? `/drafts/archive?token=${encodeURIComponent(token)}` : "/drafts/archive";
 
   return (
-    <PageShell token={token} title={draft.title} subtitle={`Status: ${draft.status}`}>
+    <PageShell
+      token={token}
+      title={draft.title}
+      subtitle={`Status: ${draft.status}`}
+      actions={
+        <Link
+          href={archiveLink}
+          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+        >
+          Draft archive
+        </Link>
+      }
+    >
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Draft JSON</div>
