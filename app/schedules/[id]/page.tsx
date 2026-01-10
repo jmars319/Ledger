@@ -14,13 +14,25 @@ export default async function SchedulePage({
   searchParams?: Promise<{ token?: string }>;
 }) {
   const resolvedParams = await params;
-  const token = (await searchParams)?.token;
+  const queryParams = await searchParams;
+  const token = queryParams?.token;
   const store = getStore();
   const schedule = await store.getSchedule(resolvedParams.id);
   if (!schedule) {
     notFound();
   }
-  const archiveLink = token ? `/schedules/archive?token=${encodeURIComponent(token)}` : "/schedules/archive";
+  const archiveLink = (() => {
+    const nextParams = new URLSearchParams();
+    if (token) nextParams.set("token", token);
+    if (queryParams?.status) nextParams.set("status", queryParams.status);
+    return nextParams.toString() ? `/schedules/archive?${nextParams.toString()}` : "/schedules/archive";
+  })();
+  const backLink = (() => {
+    const nextParams = new URLSearchParams();
+    if (token) nextParams.set("token", token);
+    if (queryParams?.type) nextParams.set("type", queryParams.type);
+    return nextParams.toString() ? `/inbox?${nextParams.toString()}` : "/inbox";
+  })();
 
   return (
     <PageShell
@@ -28,12 +40,20 @@ export default async function SchedulePage({
       title="Schedule proposal"
       subtitle={`Status: ${schedule.status}`}
       actions={
-        <Link
-          href={archiveLink}
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
-        >
-          Schedule archive
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={backLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            Back to inbox
+          </Link>
+          <Link
+            href={archiveLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            Schedule archive
+          </Link>
+        </div>
       }
     >
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

@@ -14,13 +14,25 @@ export default async function DraftPage({
   searchParams?: Promise<{ token?: string }>;
 }) {
   const resolvedParams = await params;
-  const token = (await searchParams)?.token;
+  const queryParams = await searchParams;
+  const token = queryParams?.token;
   const store = getStore();
   const draft = await store.getDraft(resolvedParams.id);
   if (!draft) {
     notFound();
   }
-  const archiveLink = token ? `/drafts/archive?token=${encodeURIComponent(token)}` : "/drafts/archive";
+  const archiveLink = (() => {
+    const nextParams = new URLSearchParams();
+    if (token) nextParams.set("token", token);
+    if (queryParams?.status) nextParams.set("status", queryParams.status);
+    return nextParams.toString() ? `/drafts/archive?${nextParams.toString()}` : "/drafts/archive";
+  })();
+  const backLink = (() => {
+    const nextParams = new URLSearchParams();
+    if (token) nextParams.set("token", token);
+    if (queryParams?.type) nextParams.set("type", queryParams.type);
+    return nextParams.toString() ? `/inbox?${nextParams.toString()}` : "/inbox";
+  })();
 
   return (
     <PageShell
@@ -28,12 +40,20 @@ export default async function DraftPage({
       title={draft.title}
       subtitle={`Status: ${draft.status}`}
       actions={
-        <Link
-          href={archiveLink}
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
-        >
-          Draft archive
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={backLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            Back to inbox
+          </Link>
+          <Link
+            href={archiveLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            Draft archive
+          </Link>
+        </div>
       }
     >
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

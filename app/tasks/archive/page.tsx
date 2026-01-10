@@ -2,10 +2,13 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import { getStore } from "@/lib/store";
 
-const withToken = (href: string, token?: string) => {
-  if (!token) return href;
-  const separator = href.includes("?") ? "&" : "?";
-  return `${href}${separator}token=${encodeURIComponent(token)}`;
+const withParams = (href: string, params: Record<string, string | undefined>) => {
+  const nextParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) nextParams.set(key, value);
+  });
+  const query = nextParams.toString();
+  return query ? `${href}?${query}` : href;
 };
 
 export default async function TasksArchivePage({
@@ -13,11 +16,23 @@ export default async function TasksArchivePage({
 }: {
   searchParams?: Promise<{ token?: string }>;
 }) {
-  const token = (await searchParams)?.token;
+  const params = await searchParams;
+  const token = params?.token;
   const store = getStore();
-  const tasks = (await store.listTasks()).filter((task) => task.status !== "PENDING");
+  const statusFilter = params?.status ?? "all";
+  const tasks = (await store.listTasks()).filter((task) => {
+    if (task.status === "PENDING") return false;
+    if (statusFilter === "all") return true;
+    if (statusFilter === "done") return task.status === "DONE";
+    if (statusFilter === "skipped") return task.status === "SKIPPED";
+    return true;
+  });
   const doneCount = tasks.filter((task) => task.status === "DONE").length;
   const skippedCount = tasks.filter((task) => task.status === "SKIPPED").length;
+  const chipClass = (active: boolean) =>
+    `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
+  const makeFilterLink = (value: string) =>
+    withParams("/tasks/archive", { token, status: value === "all" ? undefined : value });
 
   return (
     <PageShell
@@ -26,13 +41,27 @@ export default async function TasksArchivePage({
       subtitle="Completed or skipped manual tasks."
       actions={
         <Link
-          href={withToken("/tasks", token)}
+          href={withParams("/tasks", {
+            token,
+            status: statusFilter === "all" ? undefined : statusFilter,
+          })}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
         >
           Back to tasks
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-2">
+        {[
+          { label: "All", value: "all" },
+          { label: "Done", value: "done" },
+          { label: "Skipped", value: "skipped" },
+        ].map((item) => (
+          <Link key={item.value} href={makeFilterLink(item.value)} className={chipClass(statusFilter === item.value)}>
+            {item.label}
+          </Link>
+        ))}
+      </section>
       <section className="flex flex-wrap gap-3">
         <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
           Done: {doneCount}

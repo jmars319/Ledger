@@ -3,15 +3,39 @@ import PageShell from "@/app/components/PageShell";
 import TaskActions from "@/app/components/TaskActions";
 import { getStore } from "@/lib/store";
 
+const withParams = (href: string, params: Record<string, string | undefined>) => {
+  const nextParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) nextParams.set(key, value);
+  });
+  const query = nextParams.toString();
+  return query ? `${href}?${query}` : href;
+};
+
 export default async function TasksPage({
   searchParams,
 }: {
   searchParams?: Promise<{ token?: string }>;
 }) {
-  const token = (await searchParams)?.token;
+  const params = await searchParams;
+  const token = params?.token;
   const store = getStore();
-  const tasks = (await store.listTasks()).filter((task) => task.status === "PENDING");
-  const archiveLink = token ? `/tasks/archive?token=${encodeURIComponent(token)}` : "/tasks/archive";
+  const statusFilter = params?.status ?? "pending";
+  const tasks = (await store.listTasks()).filter((task) => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "pending") return task.status === "PENDING";
+    if (statusFilter === "done") return task.status === "DONE";
+    if (statusFilter === "skipped") return task.status === "SKIPPED";
+    return task.status === "PENDING";
+  });
+  const archiveLink = withParams("/tasks/archive", {
+    token,
+    status: statusFilter === "pending" ? undefined : statusFilter,
+  });
+  const chipClass = (active: boolean) =>
+    `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
+  const makeFilterLink = (value: string) =>
+    withParams("/tasks", { token, status: value === "pending" ? undefined : value });
 
   return (
     <PageShell
@@ -27,6 +51,18 @@ export default async function TasksPage({
         </Link>
       }
     >
+      <section className="flex flex-wrap gap-2">
+        {[
+          { label: "Pending", value: "pending" },
+          { label: "Done", value: "done" },
+          { label: "Skipped", value: "skipped" },
+          { label: "All", value: "all" },
+        ].map((item) => (
+          <Link key={item.value} href={makeFilterLink(item.value)} className={chipClass(statusFilter === item.value)}>
+            {item.label}
+          </Link>
+        ))}
+      </section>
       <section className="grid gap-4">
         {tasks.map((task: any) => (
           <div
