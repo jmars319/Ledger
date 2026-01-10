@@ -123,6 +123,12 @@ Raw multi-line PEM also works if your shell/env loader preserves newlines.
 - SKIP if env vars exist but no installation is connected
 - OK if installation token can be generated
 
+## AI integration (optional)
+Ledger can generate drafts manually using OpenAI. This is pay-as-you-go and requires `OPENAI_API_KEY`.
+- Local dev: set `OPENAI_API_KEY` in `.env.local`.
+- Production: set it in Railway env vars.
+- Drafts are created only via explicit API calls and remain human-reviewed.
+
 ## Scripts
 - `npm run dev`
 - `npm run dev:turbo` (guarded; only if Turbopack root is safe)
