@@ -1,6 +1,7 @@
 import { getPrismaClient } from "@/lib/prisma";
 import type {
   AuditLog as PrismaAuditLog,
+  Brief as PrismaBrief,
   Draft as PrismaDraft,
   RepoAccess as PrismaRepoAccess,
   ScheduleItem as PrismaScheduleItem,
@@ -77,6 +78,13 @@ const mapAudit = (audit: PrismaAuditLog): AuditLog => ({
   metadata: audit.metadata ?? undefined,
 });
 
+const mapBrief = (brief: PrismaBrief) => ({
+  id: brief.id,
+  projectId: brief.projectId,
+  summary: brief.summary,
+  createdAt: brief.createdAt.toISOString(),
+});
+
 const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
   const prisma = getPrismaClient();
   await prisma.auditLog.create({
@@ -125,6 +133,22 @@ export const createDbStore = (): StorageAdapter => ({
       drafts: drafts.map(mapDraft),
       schedules: schedules.map(mapSchedule),
     };
+  },
+
+  async listProjects() {
+    const prisma = getPrismaClient();
+    const projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      tag: project.tag,
+    }));
+  },
+
+  async listBriefs() {
+    const prisma = getPrismaClient();
+    const briefs = await prisma.brief.findMany({ orderBy: { createdAt: "desc" } });
+    return briefs.map(mapBrief);
   },
 
   async listDrafts() {

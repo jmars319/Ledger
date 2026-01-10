@@ -241,6 +241,14 @@ export const createMemoryStore = (): StorageAdapter => ({
     };
   },
 
+  async listProjects() {
+    return [...data.projects];
+  },
+
+  async listBriefs() {
+    return [...data.briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
   async listDrafts() {
     return data.drafts;
   },
