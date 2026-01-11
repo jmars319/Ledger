@@ -23,17 +23,29 @@ export async function POST(request: Request) {
   if (!body?.summary || typeof body.summary !== "string") {
     return NextResponse.json({ error: "summary is required." }, { status: 400 });
   }
+  const evidenceBundleId =
+    typeof body?.evidenceBundleId === "string" ? body.evidenceBundleId : undefined;
+  const sourceRepoId =
+    typeof body?.sourceRepoId === "string" ? body.sourceRepoId : undefined;
 
   const prisma = getPrismaClient();
   const project = await prisma.project.findUnique({ where: { id: body.projectId } });
   if (!project) {
     return NextResponse.json({ error: "Project not found." }, { status: 404 });
   }
+  if (sourceRepoId) {
+    const repo = await prisma.repoAccess.findUnique({ where: { id: sourceRepoId } });
+    if (!repo) {
+      return NextResponse.json({ error: "Repo not found." }, { status: 404 });
+    }
+  }
 
   const brief = await prisma.brief.create({
     data: {
       projectId: body.projectId,
       summary: body.summary.trim(),
+      evidenceBundleId,
+      sourceRepoId,
     },
   });
 

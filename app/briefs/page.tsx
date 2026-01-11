@@ -10,14 +10,18 @@ export default async function BriefsPage({
 }) {
   const token = (await searchParams)?.token;
   const store = getStore();
-  const [briefs, projects] = await Promise.all([store.listBriefs(), store.listProjects()]);
+  const [briefs, projects, repos] = await Promise.all([
+    store.listBriefs(),
+    store.listProjects(),
+    store.listRepos(),
+  ]);
 
   return (
     <PageShell token={token} title="Briefs" subtitle="Create and manage review briefs.">
       <PurposeCard>
-        Define the context and constraints used to generate drafts for review.
+        Define the context and constraints used to generate posts for review.
       </PurposeCard>
-      <BriefsClient briefs={briefs} projects={projects} token={token} />
+      <BriefsClient briefs={briefs} projects={projects} repos={repos} token={token} />
     </PageShell>
   );
 }
