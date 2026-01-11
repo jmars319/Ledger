@@ -7,8 +7,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  if (!body?.draftId || typeof body.draftId !== "string") {
-    return NextResponse.json({ error: "draftId is required." }, { status: 400 });
+  if (!body?.postId || typeof body.postId !== "string") {
+    return NextResponse.json({ error: "postId is required." }, { status: 400 });
   }
   if (!body?.scheduledFor || typeof body.scheduledFor !== "string") {
     return NextResponse.json({ error: "scheduledFor is required." }, { status: 400 });
@@ -23,18 +23,18 @@ export async function POST(request: Request) {
   }
 
   const prisma = getPrismaClient();
-  const draft = await prisma.draft.findUnique({ where: { id: body.draftId } });
-  if (!draft) {
-    return NextResponse.json({ error: "Draft not found." }, { status: 404 });
+  const post = await prisma.post.findUnique({ where: { id: body.postId } });
+  if (!post) {
+    return NextResponse.json({ error: "Post not found." }, { status: 404 });
   }
 
   const schedule = await prisma.scheduleProposal.create({
     data: {
-      projectId: draft.projectId,
+      projectId: post.projectId,
       status: "NEEDS_REVIEW",
       items: {
         create: {
-          draftId: draft.id,
+          postId: post.id,
           channel: body.channel.trim(),
           scheduledFor,
         },
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       action: "SCHEDULE_CREATED",
       entityType: "ScheduleProposal",
       entityId: schedule.id,
-      metadata: { draftId: draft.id },
+      metadata: { postId: post.id },
     },
   });
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     status: schedule.status,
     items: schedule.items.map((item) => ({
       id: item.id,
-      draftId: item.draftId,
+      postId: item.postId,
       channel: item.channel,
       scheduledFor: item.scheduledFor.toISOString(),
     })),

@@ -1,9 +1,9 @@
 # Ledger (v1 scaffold)
 
-Ledger is an internal AI Ops panel for the social media post pipeline: repo -> brief -> drafts -> approvals -> schedule -> reminders. This v1 scaffold is intentionally simple and read-only; it uses mocked data, a thin local API layer, and optional GitHub App integration. Ledger does not modify repo contents in this version.
+Ledger is an internal AI Ops panel for the social media post pipeline: repo -> brief -> posts -> approvals -> schedule -> reminders. This v1 scaffold is intentionally simple and read-only; it uses mocked data, a thin local API layer, and optional GitHub App integration. Ledger does not modify repo contents in this version.
 
 ## V1 scope
-- Read-only internal UI for review workflows: dashboard, inbox, drafts, schedules, tasks, settings
+- Read-only internal UI for review workflows: dashboard, inbox, posts, schedules, tasks, settings
 - In-memory storage with seeded data (default)
 - Thin API routes for approvals, revisions, and task updates
 - Admin token gate for every page and API route
@@ -124,10 +124,10 @@ Raw multi-line PEM also works if your shell/env loader preserves newlines.
 - OK if installation token can be generated
 
 ## AI integration (optional)
-Ledger can generate drafts manually using OpenAI. This is pay-as-you-go and requires `OPENAI_API_KEY`.
+Ledger can generate posts manually using OpenAI. This is pay-as-you-go and requires `OPENAI_API_KEY`.
 - Local dev: set `OPENAI_API_KEY` in `.env.local`.
 - Production: set it in Railway env vars.
-- Drafts are created only via explicit API calls and remain human-reviewed.
+- Posts are created only via explicit API calls and remain human-reviewed.
 
 ## Scripts
 - `npm run dev`
@@ -150,6 +150,6 @@ Ledger can generate drafts manually using OpenAI. This is pay-as-you-go and requ
 
 ## Future steps
 - Expand GitHub App ingestion endpoints (commits/releases/PRs) if needed
-- OpenAI API for draft and schedule generation
+- OpenAI API for post and schedule generation
 - Background worker for scheduling and reminders
 - SendGrid emails for notifications

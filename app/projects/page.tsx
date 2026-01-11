@@ -15,7 +15,7 @@ export default async function ProjectsPage({
   return (
     <PageShell token={token} title="Projects" subtitle="Manage project tags and names.">
       <PurposeCard>
-        Keep project tags consistent so briefs, repos, and drafts align to the right brand.
+        Keep project tags consistent so briefs, repos, and posts align to the right brand.
       </PurposeCard>
       <ProjectsClient projects={projects} token={token} />
     </PageShell>

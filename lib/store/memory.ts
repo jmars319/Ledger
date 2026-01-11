@@ -2,8 +2,8 @@ import { randomUUID } from "crypto";
 import {
   AuditLog,
   DashboardSummary,
-  Draft,
-  DraftStatus,
+  Post,
+  PostStatus,
   InboxSummary,
   Project,
   RepoAccess,
@@ -20,7 +20,7 @@ const nowIso = () => new Date().toISOString();
 type MemoryData = {
   projects: Project[];
   briefs: Brief[];
-  drafts: Draft[];
+  posts: Post[];
   schedules: ScheduleProposal[];
   tasks: Task[];
   repos: RepoAccess[];
@@ -29,14 +29,14 @@ type MemoryData = {
 
 const seedData = (): MemoryData => {
   const createdAt = nowIso();
-  const drafts: Draft[] = [
+  const posts: Post[] = [
     {
-      id: "draft-jamarq-li-001",
+      id: "post-jamarq-li-001",
       projectId: "project-jamarq",
       platform: "LinkedIn",
       title: "JAMARQ Q1 Launch",
       status: "NEEDS_REVIEW",
-      draftJson: {
+      postJson: {
         headline: "JAMARQ launches Ledger",
         body: "Introducing Ledger for pipeline visibility.",
         cta: "Book a demo",
@@ -46,25 +46,25 @@ const seedData = (): MemoryData => {
       updatedAt: createdAt,
     },
     {
-      id: "draft-jamarq-x-001",
+      id: "post-jamarq-x-001",
       projectId: "project-jamarq",
       platform: "X",
       title: "JAMARQ Ledger teaser",
       status: "NEEDS_REVIEW",
-      draftJson: {
-        text: "Ledger keeps the post pipeline clear: repo -> brief -> drafts -> approvals -> schedule.",
+      postJson: {
+        text: "Ledger keeps the post pipeline clear: repo -> brief -> posts -> approvals -> schedule.",
       },
       claims: ["Internal workflow summary"],
       createdAt,
       updatedAt: createdAt,
     },
     {
-      id: "draft-jamarq-fb-001",
+      id: "post-jamarq-fb-001",
       projectId: "project-jamarq",
       platform: "Facebook",
       title: "Ledger v1 announcement",
       status: "NEEDS_REVIEW",
-      draftJson: {
+      postJson: {
         headline: "Ledger v1",
         body: "An internal ops panel for the social pipeline.",
       },
@@ -73,12 +73,12 @@ const seedData = (): MemoryData => {
       updatedAt: createdAt,
     },
     {
-      id: "draft-tenra-li-001",
+      id: "post-tenra-li-001",
       projectId: "project-tenra",
       platform: "LinkedIn",
       title: "TENRA monthly update",
       status: "NEEDS_REVIEW",
-      draftJson: {
+      postJson: {
         headline: "TENRA product update",
         body: "Pipeline visibility and approvals tightened.",
       },
@@ -87,12 +87,12 @@ const seedData = (): MemoryData => {
       updatedAt: createdAt,
     },
     {
-      id: "draft-tenra-x-001",
+      id: "post-tenra-x-001",
       projectId: "project-tenra",
       platform: "X",
       title: "TENRA schedule note",
       status: "NEEDS_REVIEW",
-      draftJson: {
+      postJson: {
         text: "TENRA posts now follow a clear review and schedule path.",
       },
       claims: ["Schedule path defined"],
@@ -100,14 +100,14 @@ const seedData = (): MemoryData => {
       updatedAt: createdAt,
     },
     {
-      id: "draft-tenra-fb-001",
+      id: "post-tenra-fb-001",
       projectId: "project-tenra",
       platform: "Facebook",
       title: "TENRA ops panel",
       status: "NEEDS_REVIEW",
-      draftJson: {
+      postJson: {
         headline: "TENRA ops",
-        body: "Review drafts, approve schedules, keep reminders on track.",
+        body: "Review posts, approve schedules, keep reminders on track.",
       },
       claims: ["Internal review steps"],
       createdAt,
@@ -120,10 +120,10 @@ const seedData = (): MemoryData => {
       id: "schedule-001",
       projectId: "project-jamarq",
       status: "NEEDS_REVIEW",
-      items: drafts.map((draft) => ({
-        id: `item-${draft.id}`,
-        draftId: draft.id,
-        channel: draft.platform,
+      items: posts.map((post) => ({
+        id: `item-${post.id}`,
+        postId: post.id,
+        channel: post.platform,
         scheduledFor: new Date(Date.now() + 86400000).toISOString(),
       })),
       createdAt,
@@ -138,7 +138,7 @@ const seedData = (): MemoryData => {
       title: "Send LinkedIn post to Legal",
       status: "PENDING",
       dueAt: new Date(Date.now() + 2 * 86400000).toISOString(),
-      copyText: "Please review the JAMARQ LinkedIn draft for compliance.",
+      copyText: "Please review the JAMARQ LinkedIn post for compliance.",
     },
     {
       id: "task-002",
@@ -159,10 +159,10 @@ const seedData = (): MemoryData => {
     {
       id: "task-004",
       projectId: "project-tenra",
-      title: "Draft reminder email",
+      title: "Post reminder email",
       status: "PENDING",
       dueAt: new Date(Date.now() + 5 * 86400000).toISOString(),
-      copyText: "Draft a reminder for TENRA content owners.",
+      copyText: "Send a reminder for TENRA content owners.",
     },
   ];
 
@@ -172,7 +172,7 @@ const seedData = (): MemoryData => {
       repo: "jamarq/ledger-content",
       projectTag: "JAMARQ",
       enabled: true,
-      triggerDrafts: true,
+      triggerPosts: true,
       triggerSchedules: true,
       triggerTasks: true,
     },
@@ -181,7 +181,7 @@ const seedData = (): MemoryData => {
       repo: "tenra/social-kit",
       projectTag: "TENRA",
       enabled: true,
-      triggerDrafts: true,
+      triggerPosts: true,
       triggerSchedules: false,
       triggerTasks: true,
     },
@@ -196,6 +196,7 @@ const seedData = (): MemoryData => {
     {
       id: "brief-001",
       projectId: "project-jamarq",
+      sourceRepoId: undefined,
       summary: "Launch Ledger v1 with clear internal positioning and review steps.",
       createdAt,
     },
@@ -204,7 +205,7 @@ const seedData = (): MemoryData => {
   return {
     projects,
     briefs,
-    drafts,
+    posts,
     schedules,
     tasks,
     repos,
@@ -226,7 +227,7 @@ export const createMemoryStore = (): StorageAdapter => ({
   async getDashboard(): Promise<DashboardSummary> {
     return {
       counts: {
-        draftsReady: data.drafts.filter((draft) => draft.status === "NEEDS_REVIEW").length,
+        postsReady: data.posts.filter((post) => post.status === "NEEDS_REVIEW").length,
         schedulesReady: data.schedules.filter((schedule) => schedule.status === "NEEDS_REVIEW").length,
         tasksDue: data.tasks.filter((task) => task.status === "PENDING").length,
       },
@@ -236,7 +237,7 @@ export const createMemoryStore = (): StorageAdapter => ({
 
   async listInbox(): Promise<InboxSummary> {
     return {
-      drafts: data.drafts.filter((draft) => draft.status === "NEEDS_REVIEW"),
+      posts: data.posts.filter((post) => post.status === "NEEDS_REVIEW"),
       schedules: data.schedules.filter((schedule) => schedule.status === "NEEDS_REVIEW"),
     };
   },
@@ -249,27 +250,27 @@ export const createMemoryStore = (): StorageAdapter => ({
     return [...data.briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
-  async listDrafts() {
-    return data.drafts;
+  async listPosts() {
+    return data.posts;
   },
 
-  async getDraft(id: string) {
-    return data.drafts.find((draft) => draft.id === id) ?? null;
+  async getPost(id: string) {
+    return data.posts.find((post) => post.id === id) ?? null;
   },
 
-  async updateDraftStatus(id: string, status: DraftStatus, note?: string) {
-    const draft = data.drafts.find((item) => item.id === id);
-    if (!draft) return null;
-    draft.status = status;
-    draft.updatedAt = nowIso();
+  async updatePostStatus(id: string, status: PostStatus, note?: string) {
+    const post = data.posts.find((item) => item.id === id);
+    if (!post) return null;
+    post.status = status;
+    post.updatedAt = nowIso();
     addAuditLog({
       actor: "admin",
-      action: `DRAFT_${status}`,
-      entityType: "Draft",
-      entityId: draft.id,
+      action: `POST_${status}`,
+      entityType: "Post",
+      entityId: post.id,
       note,
     });
-    return draft;
+    return post;
   },
 
   async getSchedule(id: string) {

@@ -10,7 +10,7 @@ export default function SettingsAIIntegrationSummary({
         OpenAI: <span className="text-slate-300">{configured ? "Configured" : "Not configured"}</span>
       </div>
       <div className="mt-2 text-xs text-slate-500">
-        Add `OPENAI_API_KEY` in `.env.local` or Railway env vars to enable manual draft
+        Add `OPENAI_API_KEY` in `.env.local` or Railway env vars to enable manual post
         generation.
       </div>
     </div>

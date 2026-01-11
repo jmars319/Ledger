@@ -20,12 +20,12 @@ export default async function InboxArchivePage({
   const token = params?.token;
   const store = getStore();
   const typeFilter = params?.type ?? "all";
-  const allDrafts = (await store.listDrafts()).filter((draft) => draft.status !== "NEEDS_REVIEW");
+  const allPosts = (await store.listPosts()).filter((post) => post.status !== "NEEDS_REVIEW");
   const allSchedules = (await store.listSchedules()).filter(
     (schedule) => schedule.status !== "NEEDS_REVIEW"
   );
-  const filteredDrafts = typeFilter === "schedules" ? [] : allDrafts;
-  const filteredSchedules = typeFilter === "drafts" ? [] : allSchedules;
+  const filteredPosts = typeFilter === "schedules" ? [] : allPosts;
+  const filteredSchedules = typeFilter === "posts" ? [] : allSchedules;
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
@@ -35,7 +35,7 @@ export default async function InboxArchivePage({
     <PageShell
       token={token}
       title="Inbox archive"
-      subtitle="Reviewed drafts and schedules."
+      subtitle="Reviewed posts and schedules."
       actions={
         <Link
           href={withParams("/inbox", {
@@ -51,7 +51,7 @@ export default async function InboxArchivePage({
       <section className="flex flex-wrap gap-2">
         {[
           { label: "All", value: "all" },
-          { label: "Drafts", value: "drafts" },
+          { label: "Posts", value: "posts" },
           { label: "Schedules", value: "schedules" },
         ].map((item) => (
           <Link key={item.value} href={makeFilterLink(item.value)} className={chipClass(typeFilter === item.value)}>
@@ -61,7 +61,7 @@ export default async function InboxArchivePage({
       </section>
       <section className="flex flex-wrap gap-3">
         <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
-          Drafts: {filteredDrafts.length}
+          Posts: {filteredPosts.length}
         </span>
         <span className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300">
           Schedules: {filteredSchedules.length}
@@ -69,22 +69,22 @@ export default async function InboxArchivePage({
       </section>
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-sm font-semibold text-slate-200">Drafts</div>
+          <div className="text-sm font-semibold text-slate-200">Posts</div>
           <div className="mt-4 grid gap-3">
-            {filteredDrafts.length === 0 ? (
-              <div className="text-sm text-slate-500">No reviewed drafts yet.</div>
+            {filteredPosts.length === 0 ? (
+              <div className="text-sm text-slate-500">No reviewed posts yet.</div>
             ) : (
-              filteredDrafts.map((draft) => (
+              filteredPosts.map((post) => (
                 <Link
-                  key={draft.id}
-                  href={withParams(`/drafts/${draft.id}`, {
+                  key={post.id}
+                  href={withParams(`/posts/${post.id}`, {
                     token,
                     type: typeFilter === "all" ? undefined : typeFilter,
                   })}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"
                 >
-                  <div className="font-semibold text-slate-100">{draft.title}</div>
-                  <div className="text-xs text-slate-500">{draft.platform} · {draft.status}</div>
+                  <div className="font-semibold text-slate-100">{post.title}</div>
+                  <div className="text-xs text-slate-500">{post.platform} · {post.status}</div>
                 </Link>
               ))
             )}

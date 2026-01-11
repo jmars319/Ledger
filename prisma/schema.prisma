@@ -6,7 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
-enum DraftStatus {
+enum PostStatus {
   NEEDS_REVIEW
   REVISION_REQUESTED
   APPROVED
@@ -26,12 +26,25 @@ enum TaskStatus {
   SKIPPED
 }
 
+enum EvidenceType {
+  COMMIT
+  PULL_REQUEST
+  RELEASE
+  DOCUMENTATION
+}
+
+enum EvidenceScope {
+  FULL
+  DAYS
+  COMMITS
+}
+
 model Project {
   id        String             @id @default(cuid())
   name      String
   tag       String             @unique
   briefs    Brief[]
-  drafts    Draft[]
+  posts     Post[]
   schedules ScheduleProposal[]
   tasks     Task[]
   repos     RepoAccess[]
@@ -42,11 +55,12 @@ model RepoAccess {
   repo             String
   projectTag       String
   enabled          Boolean  @default(true)
-  triggerDrafts    Boolean  @default(true)
+  triggerPosts     Boolean  @default(true)
   triggerSchedules Boolean  @default(false)
   triggerTasks     Boolean  @default(false)
   projectId        String?
   project          Project? @relation(fields: [projectId], references: [id])
+  briefs           Brief[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -54,18 +68,22 @@ model RepoAccess {
 model Brief {
   id        String   @id @default(cuid())
   projectId String
+  evidenceBundleId String?
+  sourceRepoId String?
   summary   String
   createdAt DateTime @default(now())
   project   Project  @relation(fields: [projectId], references: [id])
+  evidenceBundle EvidenceBundle? @relation(fields: [evidenceBundleId], references: [id])
+  sourceRepo RepoAccess? @relation(fields: [sourceRepoId], references: [id])
 }
 
-model Draft {
+model Post {
   id        String      @id @default(cuid())
   projectId String
   platform  String
   title     String
-  status    DraftStatus
-  draftJson Json
+  status    PostStatus
+  postJson  Json
   claims    String[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -86,11 +104,11 @@ model ScheduleProposal {
 model ScheduleItem {
   id                 String            @id @default(cuid())
   scheduleProposalId String
-  draftId            String
+  postId            String
   channel            String
   scheduledFor       DateTime
   scheduleProposal   ScheduleProposal  @relation(fields: [scheduleProposalId], references: [id])
-  draft              Draft?            @relation(fields: [draftId], references: [id])
+  post              Post?            @relation(fields: [postId], references: [id])
 }
 
 model Task {
@@ -114,6 +132,32 @@ model AuditLog {
   entityId   String
   note       String?
   metadata   Json?
+}
+
+model EvidenceBundle {
+  id           String         @id @default(cuid())
+  repoId       String
+  repoFullName String
+  scope        EvidenceScope
+  scopeValue   Int?
+  scopePage    Int?
+  autoSelected Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  items        EvidenceItem[]
+  briefs       Brief[]
+}
+
+model EvidenceItem {
+  id         String       @id @default(cuid())
+  bundleId   String
+  type       EvidenceType
+  title      String
+  body       String?
+  url        String?
+  occurredAt DateTime
+  content    String?
+  metadata   Json?
+  bundle     EvidenceBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
 }
 
 model GitHubInstallation {

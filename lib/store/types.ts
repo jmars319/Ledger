@@ -1,4 +1,4 @@
-export type DraftStatus = "NEEDS_REVIEW" | "REVISION_REQUESTED" | "APPROVED" | "REJECTED";
+export type PostStatus = "NEEDS_REVIEW" | "REVISION_REQUESTED" | "APPROVED" | "REJECTED";
 export type ScheduleStatus = "NEEDS_REVIEW" | "REVISION_REQUESTED" | "APPROVED" | "REJECTED";
 export type TaskStatus = "PENDING" | "DONE" | "SKIPPED";
 
@@ -13,7 +13,7 @@ export type RepoAccess = {
   repo: string;
   projectTag: string;
   enabled: boolean;
-  triggerDrafts: boolean;
+  triggerPosts: boolean;
   triggerSchedules: boolean;
   triggerTasks: boolean;
 };
@@ -21,17 +21,19 @@ export type RepoAccess = {
 export type Brief = {
   id: string;
   projectId: string;
+  evidenceBundleId?: string | null;
+  sourceRepoId?: string | null;
   summary: string;
   createdAt: string;
 };
 
-export type Draft = {
+export type Post = {
   id: string;
   projectId: string;
   platform: string;
   title: string;
-  status: DraftStatus;
-  draftJson: Record<string, unknown>;
+  status: PostStatus;
+  postJson: Record<string, unknown>;
   claims: string[];
   createdAt: string;
   updatedAt: string;
@@ -39,7 +41,7 @@ export type Draft = {
 
 export type ScheduleItem = {
   id: string;
-  draftId: string;
+  postId: string;
   channel: string;
   scheduledFor: string;
 };
@@ -75,7 +77,7 @@ export type AuditLog = {
 
 export type DashboardSummary = {
   counts: {
-    draftsReady: number;
+    postsReady: number;
     schedulesReady: number;
     tasksDue: number;
   };
@@ -83,7 +85,7 @@ export type DashboardSummary = {
 };
 
 export type InboxSummary = {
-  drafts: Draft[];
+  posts: Post[];
   schedules: ScheduleProposal[];
 };
 
@@ -92,9 +94,9 @@ export type StorageAdapter = {
   listInbox(): Promise<InboxSummary>;
   listProjects(): Promise<Project[]>;
   listBriefs(): Promise<Brief[]>;
-  listDrafts(): Promise<Draft[]>;
-  getDraft(id: string): Promise<Draft | null>;
-  updateDraftStatus(id: string, status: DraftStatus, note?: string): Promise<Draft | null>;
+  listPosts(): Promise<Post[]>;
+  getPost(id: string): Promise<Post | null>;
+  updatePostStatus(id: string, status: PostStatus, note?: string): Promise<Post | null>;
   listSchedules(): Promise<ScheduleProposal[]>;
   getSchedule(id: string): Promise<ScheduleProposal | null>;
   updateScheduleStatus(id: string, status: ScheduleStatus, note?: string): Promise<ScheduleProposal | null>;

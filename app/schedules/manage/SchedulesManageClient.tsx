@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { Draft, ScheduleProposal } from "@/lib/store/types";
+import type { Post, ScheduleProposal } from "@/lib/store/types";
 
 type Props = {
-  drafts: Draft[];
+  posts: Post[];
   schedules: ScheduleProposal[];
   token?: string;
 };
@@ -12,9 +12,9 @@ type Props = {
 const authHeaders = (token?: string) =>
   token ? { "x-admin-token": token } : undefined;
 
-export default function SchedulesManageClient({ drafts, schedules, token }: Props) {
+export default function SchedulesManageClient({ posts, schedules, token }: Props) {
   const [items, setItems] = useState<ScheduleProposal[]>(schedules);
-  const [draftId, setDraftId] = useState(drafts[0]?.id ?? "");
+  const [postId, setPostId] = useState(posts[0]?.id ?? "");
   const [channel, setChannel] = useState("LinkedIn");
   const [scheduledFor, setScheduledFor] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
@@ -23,9 +23,9 @@ export default function SchedulesManageClient({ drafts, schedules, token }: Prop
   const submit = async () => {
     setState("saving");
     setError(null);
-    if (!draftId) {
+    if (!postId) {
       setState("error");
-      setError("Select a draft.");
+      setError("Select a post.");
       return;
     }
     if (!scheduledFor) {
@@ -41,7 +41,7 @@ export default function SchedulesManageClient({ drafts, schedules, token }: Prop
         ...authHeaders(token),
       },
       body: JSON.stringify({
-        draftId,
+        postId,
         channel,
         scheduledFor,
       }),
@@ -66,15 +66,15 @@ export default function SchedulesManageClient({ drafts, schedules, token }: Prop
         <div className="text-sm font-semibold text-slate-200">Create schedule</div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-xs text-slate-400">
-            Draft
+            Post
             <select
-              value={draftId}
-              onChange={(event) => setDraftId(event.target.value)}
+              value={postId}
+              onChange={(event) => setPostId(event.target.value)}
               className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-100"
             >
-              {drafts.map((draft) => (
-                <option key={draft.id} value={draft.id}>
-                  {draft.title} ({draft.platform})
+              {posts.map((post) => (
+                <option key={post.id} value={post.id}>
+                  {post.title} ({post.platform})
                 </option>
               ))}
             </select>

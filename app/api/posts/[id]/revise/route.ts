@@ -6,9 +6,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json().catch(() => ({}));
   const note = typeof body?.note === "string" ? body.note : undefined;
   const store = getStore();
-  const draft = await store.updateDraftStatus(resolvedParams.id, "REJECTED", note);
-  if (!draft) {
+  const post = await store.updatePostStatus(resolvedParams.id, "REVISION_REQUESTED", note);
+  if (!post) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(draft);
+  return NextResponse.json(post);
 }

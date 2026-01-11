@@ -10,14 +10,14 @@ export default async function SchedulesManagePage({
 }) {
   const token = (await searchParams)?.token;
   const store = getStore();
-  const [drafts, schedules] = await Promise.all([store.listDrafts(), store.listSchedules()]);
+  const [posts, schedules] = await Promise.all([store.listPosts(), store.listSchedules()]);
 
   return (
     <PageShell token={token} title="Manage schedules" subtitle="Create schedule proposals.">
       <PurposeCard>
-        Manually create schedule proposals for drafts and send them through review.
+        Manually create schedule proposals for posts and send them through review.
       </PurposeCard>
-      <SchedulesManageClient drafts={drafts} schedules={schedules} token={token} />
+      <SchedulesManageClient posts={posts} schedules={schedules} token={token} />
     </PageShell>
   );
 }

@@ -2,7 +2,7 @@ import { getPrismaClient } from "@/lib/prisma";
 import type {
   AuditLog as PrismaAuditLog,
   Brief as PrismaBrief,
-  Draft as PrismaDraft,
+  Post as PrismaPost,
   RepoAccess as PrismaRepoAccess,
   ScheduleItem as PrismaScheduleItem,
   ScheduleProposal as PrismaScheduleProposal,
@@ -11,8 +11,8 @@ import type {
 import {
   AuditLog,
   DashboardSummary,
-  Draft,
-  DraftStatus,
+  Post,
+  PostStatus,
   InboxSummary,
   RepoAccess,
   ScheduleProposal,
@@ -22,16 +22,16 @@ import {
   TaskStatus,
 } from "./types";
 
-const mapDraft = (draft: PrismaDraft): Draft => ({
-  id: draft.id,
-  projectId: draft.projectId,
-  platform: draft.platform,
-  title: draft.title,
-  status: draft.status,
-  draftJson: draft.draftJson ?? {},
-  claims: draft.claims ?? [],
-  createdAt: draft.createdAt.toISOString(),
-  updatedAt: draft.updatedAt.toISOString(),
+const mapPost = (post: PrismaPost): Post => ({
+  id: post.id,
+  projectId: post.projectId,
+  platform: post.platform,
+  title: post.title,
+  status: post.status,
+  postJson: post.postJson ?? {},
+  claims: post.claims ?? [],
+  createdAt: post.createdAt.toISOString(),
+  updatedAt: post.updatedAt.toISOString(),
 });
 
 const mapSchedule = (schedule: PrismaScheduleProposal & { items: PrismaScheduleItem[] }): ScheduleProposal => ({
@@ -40,7 +40,7 @@ const mapSchedule = (schedule: PrismaScheduleProposal & { items: PrismaScheduleI
   status: schedule.status,
   items: (schedule.items ?? []).map((item) => ({
     id: item.id,
-    draftId: item.draftId,
+    postId: item.postId,
     channel: item.channel,
     scheduledFor: item.scheduledFor.toISOString(),
   })),
@@ -62,7 +62,7 @@ const mapRepo = (repo: PrismaRepoAccess): RepoAccess => ({
   repo: repo.repo,
   projectTag: repo.projectTag,
   enabled: repo.enabled,
-  triggerDrafts: repo.triggerDrafts,
+  triggerPosts: repo.triggerPosts,
   triggerSchedules: repo.triggerSchedules,
   triggerTasks: repo.triggerTasks,
 });
@@ -81,6 +81,8 @@ const mapAudit = (audit: PrismaAuditLog): AuditLog => ({
 const mapBrief = (brief: PrismaBrief) => ({
   id: brief.id,
   projectId: brief.projectId,
+  evidenceBundleId: brief.evidenceBundleId ?? undefined,
+  sourceRepoId: brief.sourceRepoId ?? undefined,
   summary: brief.summary,
   createdAt: brief.createdAt.toISOString(),
 });
@@ -102,8 +104,8 @@ const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
 export const createDbStore = (): StorageAdapter => ({
   async getDashboard(): Promise<DashboardSummary> {
     const prisma = getPrismaClient();
-    const [draftsReady, schedulesReady, tasksDue, recentAudit] = await Promise.all([
-      prisma.draft.count({ where: { status: "NEEDS_REVIEW" } }),
+    const [postsReady, schedulesReady, tasksDue, recentAudit] = await Promise.all([
+      prisma.post.count({ where: { status: "NEEDS_REVIEW" } }),
       prisma.scheduleProposal.count({ where: { status: "NEEDS_REVIEW" } }),
       prisma.task.count({ where: { status: "PENDING" } }),
       prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
@@ -111,7 +113,7 @@ export const createDbStore = (): StorageAdapter => ({
 
     return {
       counts: {
-        draftsReady,
+        postsReady,
         schedulesReady,
         tasksDue,
       },
@@ -121,8 +123,8 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listInbox(): Promise<InboxSummary> {
     const prisma = getPrismaClient();
-    const [drafts, schedules] = await Promise.all([
-      prisma.draft.findMany({ where: { status: "NEEDS_REVIEW" } }),
+    const [posts, schedules] = await Promise.all([
+      prisma.post.findMany({ where: { status: "NEEDS_REVIEW" } }),
       prisma.scheduleProposal.findMany({
         where: { status: "NEEDS_REVIEW" },
         include: { items: true },
@@ -130,7 +132,7 @@ export const createDbStore = (): StorageAdapter => ({
     ]);
 
     return {
-      drafts: drafts.map(mapDraft),
+      posts: posts.map(mapPost),
       schedules: schedules.map(mapSchedule),
     };
   },
@@ -151,37 +153,37 @@ export const createDbStore = (): StorageAdapter => ({
     return briefs.map(mapBrief);
   },
 
-  async listDrafts() {
+  async listPosts() {
     const prisma = getPrismaClient();
-    const drafts = await prisma.draft.findMany({ orderBy: { updatedAt: "desc" } });
-    return drafts.map(mapDraft);
+    const posts = await prisma.post.findMany({ orderBy: { updatedAt: "desc" } });
+    return posts.map(mapPost);
   },
 
-  async getDraft(id: string) {
+  async getPost(id: string) {
     const prisma = getPrismaClient();
-    const draft = await prisma.draft.findUnique({ where: { id } });
-    return draft ? mapDraft(draft) : null;
+    const post = await prisma.post.findUnique({ where: { id } });
+    return post ? mapPost(post) : null;
   },
 
-  async updateDraftStatus(id: string, status: DraftStatus, note?: string) {
+  async updatePostStatus(id: string, status: PostStatus, note?: string) {
     const prisma = getPrismaClient();
-    const existing = await prisma.draft.findUnique({ where: { id } });
+    const existing = await prisma.post.findUnique({ where: { id } });
     if (!existing) return null;
 
-    const draft = await prisma.draft.update({
+    const post = await prisma.post.update({
       where: { id },
       data: { status },
     });
 
     await createAuditLog({
       actor: "admin",
-      action: `DRAFT_${status}`,
-      entityType: "Draft",
+      action: `POST_${status}`,
+      entityType: "Post",
       entityId: id,
       note,
     });
 
-    return mapDraft(draft);
+    return mapPost(post);
   },
 
   async getSchedule(id: string) {
@@ -266,7 +268,7 @@ export const createDbStore = (): StorageAdapter => ({
         repo: repo.repo,
         projectTag: repo.projectTag,
         enabled: repo.enabled,
-        triggerDrafts: repo.triggerDrafts,
+        triggerPosts: repo.triggerPosts,
         triggerSchedules: repo.triggerSchedules,
         triggerTasks: repo.triggerTasks,
       })) }),

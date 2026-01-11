@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default async function SchedulePage({
+export default async function PostPage({
   params,
   searchParams,
 }: {
@@ -18,15 +18,15 @@ export default async function SchedulePage({
   const queryParams = await searchParams;
   const token = queryParams?.token;
   const store = getStore();
-  const schedule = await store.getSchedule(resolvedParams.id);
-  if (!schedule) {
+  const post = await store.getPost(resolvedParams.id);
+  if (!post) {
     notFound();
   }
   const archiveLink = (() => {
     const nextParams = new URLSearchParams();
     if (token) nextParams.set("token", token);
     if (queryParams?.status) nextParams.set("status", queryParams.status);
-    return nextParams.toString() ? `/schedules/archive?${nextParams.toString()}` : "/schedules/archive";
+    return nextParams.toString() ? `/posts/archive?${nextParams.toString()}` : "/posts/archive";
   })();
   const backLink = (() => {
     const nextParams = new URLSearchParams();
@@ -34,12 +34,18 @@ export default async function SchedulePage({
     if (queryParams?.type) nextParams.set("type", queryParams.type);
     return nextParams.toString() ? `/inbox?${nextParams.toString()}` : "/inbox";
   })();
+  const postText =
+    typeof post.postJson?.text === "string"
+      ? post.postJson.text
+      : typeof post.postJson?.body === "string"
+        ? post.postJson.body
+        : "";
 
   return (
     <PageShell
       token={token}
-      title="Schedule proposal"
-      subtitle={`Status: ${schedule.status}`}
+      title={post.title}
+      subtitle={`Status: ${post.status}`}
       actions={
         <div className="flex flex-wrap gap-2">
           <Link
@@ -52,33 +58,36 @@ export default async function SchedulePage({
             href={archiveLink}
             className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
           >
-            Schedule archive
+            Post archive
           </Link>
         </div>
       }
     >
       <PurposeCard>
-        Review a proposed schedule, then approve or request revisions before publishing.
+        Review a single post in detail and approve, request revision, or reject before publishing.
       </PurposeCard>
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-sm font-semibold text-slate-200">Proposed items</div>
-          <div className="mt-4 grid gap-3">
-            {schedule.items.map((item: any) => (
-              <div
-                key={item.id}
-                className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200"
-              >
-                <div className="font-semibold text-slate-100">{item.channel}</div>
-                <div className="text-xs text-slate-500">Post: {item.postId}</div>
-                <div className="text-xs text-slate-500">
-                  {new Date(item.scheduledFor).toLocaleString()}
-                </div>
-              </div>
-            ))}
+          <div className="text-sm font-semibold text-slate-200">Post preview</div>
+          <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-100">
+            {postText ? (
+              <div className="whitespace-pre-wrap break-words leading-relaxed">{postText}</div>
+            ) : (
+              <div className="text-sm text-slate-500">No preview text available.</div>
+            )}
           </div>
+          <div className="mt-6 text-sm font-semibold text-slate-200">Post JSON</div>
+          <pre className="mt-4 whitespace-pre-wrap break-words rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs text-slate-200">
+            {JSON.stringify(post.postJson, null, 2)}
+          </pre>
+          <div className="mt-4 text-sm font-semibold text-slate-200">Claims</div>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-400">
+            {post.claims.map((claim: string) => (
+              <li key={claim}>{claim}</li>
+            ))}
+          </ul>
         </div>
-        <ReviewActions id={schedule.id} kind="schedules" token={token} />
+        <ReviewActions id={post.id} kind="posts" token={token} />
       </section>
     </PageShell>
   );

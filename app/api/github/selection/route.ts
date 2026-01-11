@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           repo: repo.fullName,
           projectTag: defaultTag,
           enabled: true,
-          triggerDrafts: false,
+          triggerPosts: false,
           triggerSchedules: false,
           triggerTasks: false,
         },

@@ -49,11 +49,11 @@ export default async function DashboardPage({
       }
     >
       <PurposeCard>
-        A high-level snapshot of review readiness and recent actions across drafts, schedules, and tasks.
+        A high-level snapshot of review readiness and recent actions across posts, schedules, and tasks.
       </PurposeCard>
       <section className="grid gap-4 md:grid-cols-3">
         {[
-          { label: "Drafts ready", value: data.counts.draftsReady },
+          { label: "Posts ready", value: data.counts.postsReady },
           { label: "Schedules ready", value: data.counts.schedulesReady },
           { label: "Tasks due", value: data.counts.tasksDue },
         ].map((item) => (

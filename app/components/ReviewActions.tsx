@@ -5,7 +5,7 @@ import { useState } from "react";
 
 type ReviewActionsProps = {
   id: string;
-  kind: "drafts" | "schedules";
+  kind: "posts" | "schedules";
   token?: string;
 };
 

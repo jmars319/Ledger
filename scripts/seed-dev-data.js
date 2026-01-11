@@ -40,10 +40,10 @@ const daysAhead = (days) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 const ids = {
   project: "project-ledger-internal",
   brief: "brief-ledger-internal",
-  drafts: [
-    "draft-ledger-li",
-    "draft-ledger-x",
-    "draft-ledger-fb",
+  posts: [
+    "post-ledger-li",
+    "post-ledger-x",
+    "post-ledger-fb",
   ],
   schedule: "schedule-ledger-001",
   scheduleItems: [
@@ -55,9 +55,9 @@ const ids = {
   auditLogs: [
     "audit-ledger-project",
     "audit-ledger-brief",
-    "audit-ledger-draft-li",
-    "audit-ledger-draft-x",
-    "audit-ledger-draft-fb",
+    "audit-ledger-post-li",
+    "audit-ledger-post-x",
+    "audit-ledger-post-fb",
     "audit-ledger-schedule",
     "audit-ledger-task",
   ],
@@ -97,58 +97,58 @@ async function main() {
     },
   });
 
-  const draftData = [
+  const postData = [
     {
-      id: ids.drafts[0],
+      id: ids.posts[0],
       platform: "LinkedIn",
-      title: "Ledger internal ops panel (draft)",
-      draftJson: {
+      title: "Ledger internal ops panel (post)",
+      postJson: {
         headline: "Ledger internal ops panel is ready for review",
-        body: "Drafting a quick internal update for the team. Focus is on review workflow and guardrails, not launch messaging.",
+        body: "Posting a quick internal update for the team. Focus is on review workflow and guardrails, not launch messaging.",
         cta: "Reply with feedback",
       },
       claims: ["Internal-only update", "No external release"],
     },
     {
-      id: ids.drafts[1],
+      id: ids.posts[1],
       platform: "X",
-      title: "Ledger ops update (draft)",
-      draftJson: {
-        text: "Draft: Ledger ops panel ready for internal review. Keeping scope tight: auth gate, review queues, and audit logs.",
+      title: "Ledger ops update (post)",
+      postJson: {
+        text: "Post: Ledger ops panel ready for internal review. Keeping scope tight: auth gate, review queues, and audit logs.",
       },
       claims: ["Internal review stage"],
     },
     {
-      id: ids.drafts[2],
+      id: ids.posts[2],
       platform: "Facebook",
-      title: "Ledger pipeline note (draft)",
-      draftJson: {
+      title: "Ledger pipeline note (post)",
+      postJson: {
         headline: "Ledger pipeline update",
-        body: "This is a rough internal draft meant for review. No external posting yet.",
+        body: "This is a rough internal post meant for review. No external posting yet.",
       },
-      claims: ["Draft quality"],
+      claims: ["Post quality"],
     },
   ];
 
-  for (const draft of draftData) {
-    await prisma.draft.upsert({
-      where: { id: draft.id },
+  for (const post of postData) {
+    await prisma.post.upsert({
+      where: { id: post.id },
       update: {
         projectId: project.id,
-        platform: draft.platform,
-        title: draft.title,
+        platform: post.platform,
+        title: post.title,
         status: "NEEDS_REVIEW",
-        draftJson: draft.draftJson,
-        claims: draft.claims,
+        postJson: post.postJson,
+        claims: post.claims,
       },
       create: {
-        id: draft.id,
+        id: post.id,
         projectId: project.id,
-        platform: draft.platform,
-        title: draft.title,
+        platform: post.platform,
+        title: post.title,
         status: "NEEDS_REVIEW",
-        draftJson: draft.draftJson,
-        claims: draft.claims,
+        postJson: post.postJson,
+        claims: post.claims,
         createdAt: daysAgo(3),
       },
     });
@@ -171,19 +171,19 @@ async function main() {
   const scheduleItems = [
     {
       id: ids.scheduleItems[0],
-      draftId: ids.drafts[0],
+      postId: ids.posts[0],
       channel: "LinkedIn",
       scheduledFor: daysAhead(3),
     },
     {
       id: ids.scheduleItems[1],
-      draftId: ids.drafts[1],
+      postId: ids.posts[1],
       channel: "X",
       scheduledFor: daysAhead(2),
     },
     {
       id: ids.scheduleItems[2],
-      draftId: ids.drafts[2],
+      postId: ids.posts[2],
       channel: "Facebook",
       scheduledFor: daysAhead(4),
     },
@@ -194,14 +194,14 @@ async function main() {
       where: { id: item.id },
       update: {
         scheduleProposalId: ids.schedule,
-        draftId: item.draftId,
+        postId: item.postId,
         channel: item.channel,
         scheduledFor: item.scheduledFor,
       },
       create: {
         id: item.id,
         scheduleProposalId: ids.schedule,
-        draftId: item.draftId,
+        postId: item.postId,
         channel: item.channel,
         scheduledFor: item.scheduledFor,
       },
@@ -252,28 +252,28 @@ async function main() {
     {
       id: ids.auditLogs[2],
       actor: "system:drafter",
-      action: "DRAFT_GENERATED",
-      entityType: "Draft",
-      entityId: ids.drafts[0],
-      note: "Generated draft for LinkedIn review.",
+      action: "POST_GENERATED",
+      entityType: "Post",
+      entityId: ids.posts[0],
+      note: "Generated post for LinkedIn review.",
       createdAt: daysAgo(3),
     },
     {
       id: ids.auditLogs[3],
       actor: "system:drafter",
-      action: "DRAFT_GENERATED",
-      entityType: "Draft",
-      entityId: ids.drafts[1],
-      note: "Generated draft for X review.",
+      action: "POST_GENERATED",
+      entityType: "Post",
+      entityId: ids.posts[1],
+      note: "Generated post for X review.",
       createdAt: daysAgo(3),
     },
     {
       id: ids.auditLogs[4],
       actor: "system:drafter",
-      action: "DRAFT_GENERATED",
-      entityType: "Draft",
-      entityId: ids.drafts[2],
-      note: "Generated draft for Facebook review.",
+      action: "POST_GENERATED",
+      entityType: "Post",
+      entityId: ids.posts[2],
+      note: "Generated post for Facebook review.",
       createdAt: daysAgo(3),
     },
     {
@@ -282,7 +282,7 @@ async function main() {
       action: "SCHEDULE_PROPOSED",
       entityType: "ScheduleProposal",
       entityId: ids.schedule,
-      note: "Proposed draft schedule based on review readiness.",
+      note: "Proposed post schedule based on review readiness.",
       createdAt: daysAgo(2),
     },
     {

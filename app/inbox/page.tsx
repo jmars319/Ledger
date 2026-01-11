@@ -22,13 +22,13 @@ export default async function InboxPage({
   const store = getStore();
   const data = await store.listInbox();
   const typeFilter = params?.type ?? "all";
-  const drafts = typeFilter === "schedules" ? [] : data.drafts;
-  const schedules = typeFilter === "drafts" ? [] : data.schedules;
+  const posts = typeFilter === "schedules" ? [] : data.posts;
+  const schedules = typeFilter === "posts" ? [] : data.schedules;
   const archiveLink = withParams("/inbox/archive", {
     token,
     type: typeFilter === "all" ? undefined : typeFilter,
   });
-  const newDraftLink = withParams("/drafts/new", { token });
+  const newPostLink = withParams("/posts/new", { token });
   const manageSchedulesLink = withParams("/schedules/manage", { token });
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
@@ -43,10 +43,10 @@ export default async function InboxPage({
       actions={
         <div className="flex flex-wrap gap-2">
           <Link
-            href={newDraftLink}
+            href={newPostLink}
             className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
           >
-            New draft
+            New post
           </Link>
           <Link
             href={manageSchedulesLink}
@@ -64,12 +64,12 @@ export default async function InboxPage({
       }
     >
       <PurposeCard>
-        Review drafts and schedule proposals that require a human decision before they move forward.
+        Review posts and schedule proposals that require a human decision before they move forward.
       </PurposeCard>
       <section className="flex flex-wrap gap-2">
         {[
           { label: "All", value: "all" },
-          { label: "Drafts", value: "drafts" },
+          { label: "Posts", value: "posts" },
           { label: "Schedules", value: "schedules" },
         ].map((item) => (
           <Link key={item.value} href={makeFilterLink(item.value)} className={chipClass(typeFilter === item.value)}>
@@ -79,22 +79,22 @@ export default async function InboxPage({
       </section>
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-          <div className="text-sm font-semibold text-slate-200">Drafts</div>
+          <div className="text-sm font-semibold text-slate-200">Posts</div>
           <div className="mt-4 grid gap-3">
-            {drafts.length === 0 ? (
-              <div className="text-sm text-slate-500">No drafts awaiting review.</div>
+            {posts.length === 0 ? (
+              <div className="text-sm text-slate-500">No posts awaiting review.</div>
             ) : (
-              drafts.map((draft: any) => (
+              posts.map((post: any) => (
                 <Link
-                  key={draft.id}
-                  href={withParams(`/drafts/${draft.id}`, {
+                  key={post.id}
+                  href={withParams(`/posts/${post.id}`, {
                     token,
                     type: typeFilter === "all" ? undefined : typeFilter,
                   })}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"
                 >
-                  <div className="font-semibold text-slate-100">{draft.title}</div>
-                  <div className="text-xs text-slate-500">{draft.platform}</div>
+                  <div className="font-semibold text-slate-100">{post.title}</div>
+                  <div className="text-xs text-slate-500">{post.platform}</div>
                 </Link>
               ))
             )}

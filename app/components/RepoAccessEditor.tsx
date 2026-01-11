@@ -93,13 +93,13 @@ export default function RepoAccessEditor({
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={repo.triggerDrafts}
+                    checked={repo.triggerPosts}
                     onChange={(event) =>
-                      updateItem(repo.id, { triggerDrafts: event.target.checked })
+                      updateItem(repo.id, { triggerPosts: event.target.checked })
                     }
                     className="h-4 w-4 rounded border-slate-600 bg-slate-900"
                   />
-                  Trigger drafts
+                  Trigger posts
                 </label>
                 <label className="flex items-center gap-2">
                   <input
