@@ -14,6 +14,14 @@ Docs map:
 - `docs/PAGESPEED_TRADEOFFS.md`
 - `docs/COPILOT_INSTRUCTIONS_SUMMARY.md`
 
+## How to use (high-level)
+1) Connect repos with the GitHub App and select the allowlist.
+2) Capture evidence from repos or paste notes.
+3) Create briefs from evidence or text prompts.
+4) Draft posts from briefs or Content Ops items.
+5) Approve drafts, then request a schedule proposal.
+6) Track tasks and audit logs for every change.
+
 ## Briefs (DB mode)
 Briefs are short, reusable context blocks that feed post generation. They can be created by AI from repo evidence or from pasted text, then reused across multiple posts.
 

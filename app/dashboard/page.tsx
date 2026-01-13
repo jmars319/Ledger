@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
+import HowToUseModal from "@/app/dashboard/HowToUseModal";
 import { getStore } from "@/lib/store";
 import type { AuditLog } from "@/lib/store/types";
 import { getAuditDisplay } from "@/lib/audit/labels";
@@ -95,12 +96,15 @@ export default async function DashboardPage({
       title="Dashboard"
       subtitle="Pipeline snapshot with recent audit activity."
       actions={
-        <Link
-          href={archiveLink}
-          className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
-        >
-          View audit archive
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <HowToUseModal />
+          <Link
+            href={archiveLink}
+            className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
+          >
+            View audit archive
+          </Link>
+        </div>
       }
     >
       <PurposeCard>
