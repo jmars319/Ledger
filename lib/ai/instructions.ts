@@ -6,4 +6,6 @@ export {
   buildInstructionBlock,
 } from "@/lib/ai/instructionsCore";
 
+import type { InstructionContext } from "@/lib/ai/instructionsCore";
+
 export type OrgInstructions = InstructionContext["org"];
