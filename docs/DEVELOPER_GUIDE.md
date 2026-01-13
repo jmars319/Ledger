@@ -34,6 +34,12 @@ Dev-only seed data (DB mode)
 STORAGE_MODE=db NODE_ENV=development npm run db:seed
 ```
 
+Content Ops seed/smoke (DB mode)
+```bash
+npm run content:seed
+npm run content:smoke
+```
+
 GitHub App setup (optional, DB mode)
 - Configure env vars in `.env.local`.
 - Go to `/settings/integrations/github` and install/select repos.

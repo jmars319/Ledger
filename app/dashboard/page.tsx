@@ -2,17 +2,22 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
+import type { AuditLog } from "@/lib/store/types";
+import { getAuditDisplay } from "@/lib/audit/labels";
+import { getPromotionIssuesForItem } from "@/lib/content/validators";
+import { getPrismaClient } from "@/lib/prisma";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; actor?: string }>;
 }) {
   const params = await searchParams;
   const token = params?.token;
   const store = getStore();
   const data = await store.getDashboard();
   const actorFilter = params?.actor ?? "all";
+  const isDb = process.env.STORAGE_MODE === "db";
   const archiveLink = (() => {
     const nextParams = new URLSearchParams();
     if (token) nextParams.set("token", token);
@@ -33,6 +38,56 @@ export default async function DashboardPage({
     const query = nextParams.toString();
     return query ? `/dashboard?${query}` : "/dashboard";
   };
+
+  let contentNeeds = 0;
+  let contentNeedReason = "No blocking issues.";
+  let contentCount = 0;
+  let briefsCount = 0;
+  let evidenceCount = 0;
+  let githubConnected = false;
+
+  if (isDb) {
+    const prisma = getPrismaClient();
+    const [contentItems, briefTotal, evidenceTotal, githubInstall] = await Promise.all([
+      prisma.contentItem.findMany({
+        where: { status: { notIn: ["READY", "APPROVED", "ARCHIVED"] } },
+        orderBy: { updatedAt: "desc" },
+        take: 50,
+      }),
+      prisma.brief.count(),
+      prisma.evidenceBundle.count(),
+      prisma.gitHubInstallation.findFirst(),
+    ]);
+    contentCount = await prisma.contentItem.count();
+    briefsCount = briefTotal;
+    evidenceCount = evidenceTotal;
+    githubConnected = Boolean(githubInstall);
+    const issues = contentItems.flatMap((item) =>
+      getPromotionIssuesForItem({
+        type: item.type,
+        rawInput: item.rawInput,
+        structured: item.structured ?? undefined,
+        format: "md",
+      }),
+    );
+    contentNeeds = contentItems.filter((item) => {
+      const itemIssues = getPromotionIssuesForItem({
+        type: item.type,
+        rawInput: item.rawInput,
+        structured: item.structured ?? undefined,
+        format: "md",
+      });
+      return itemIssues.length > 0;
+    }).length;
+    contentNeedReason = issues[0]?.message ?? "No blocking issues.";
+  }
+
+  const needsAttention = [
+    { label: "Posts", count: data.counts.postsReady, reason: "Awaiting review." },
+    { label: "Schedules", count: data.counts.schedulesReady, reason: "Awaiting approval." },
+    { label: "Tasks", count: data.counts.tasksDue, reason: "Pending tasks." },
+    { label: "Content", count: contentNeeds, reason: contentNeedReason },
+  ];
 
   return (
     <PageShell
@@ -68,6 +123,42 @@ export default async function DashboardPage({
       </section>
 
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+        <div className="text-sm font-semibold text-slate-200">System overview</div>
+        <div className="mt-1 text-xs text-slate-500">Current module coverage and readiness.</div>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {[
+            { label: "Content", value: isDb ? contentCount : "DB only" },
+            { label: "Briefs", value: isDb ? briefsCount : "DB only" },
+            { label: "Drafts", value: data.counts.postsReady },
+            { label: "Schedules", value: data.counts.schedulesReady },
+            { label: "GitHub", value: githubConnected ? "Connected" : "Not connected" },
+            { label: "Evidence", value: isDb ? evidenceCount : "DB only" },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="text-xs uppercase tracking-wide text-slate-500">{item.label}</div>
+              <div className="mt-2 text-lg font-semibold text-white">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <details className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-200">
+          Needs attention
+        </summary>
+        <div className="mt-3 grid gap-2 text-sm text-slate-300">
+          {needsAttention.map((item) => (
+            <div key={item.label} className="rounded-lg border border-slate-800 px-3 py-2">
+              <div className="text-slate-100">
+                {item.label}: {item.count}
+              </div>
+              <div className="text-xs text-slate-500">{item.reason}</div>
+            </div>
+          ))}
+        </div>
+      </details>
+
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
         <div className="text-sm font-semibold text-slate-200">Latest audit logs</div>
         <div className="mt-3 flex flex-wrap gap-2">
           {[
@@ -84,20 +175,33 @@ export default async function DashboardPage({
           {filteredAudit.length === 0 ? (
             <div className="text-sm text-slate-500">No audit activity yet.</div>
           ) : (
-            filteredAudit.map((entry: any) => (
+            filteredAudit.map((entry: AuditLog) => {
+              const display = getAuditDisplay(entry.action);
+              return (
               <div
                 key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300"
+                className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300"
               >
-                <div>
-                  <span className="font-semibold text-slate-100">{entry.action}</span>
-                  <span className="ml-2 text-slate-500">
-                    {entry.entityType} - {entry.entityId}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-100">{display.label}</div>
+                    <div className="text-xs text-slate-500">
+                      {entry.actor ?? "system"} · {new Date(entry.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500">{display.detail}</div>
                 </div>
-                <div className="text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString()}</div>
+                {entry.metadata ? (
+                  <details className="mt-2 text-xs text-slate-400">
+                    <summary className="cursor-pointer text-slate-500">Raw details</summary>
+                    <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                      {JSON.stringify(entry.metadata, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </section>

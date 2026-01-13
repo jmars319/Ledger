@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import AIInstructions from "@/app/components/AIInstructions";
 import RepoAccessEditor from "@/app/components/RepoAccessEditor";
 import type { RepoAccess } from "@/lib/store/types";
@@ -44,21 +44,27 @@ export default function SettingsClient({
   repos: RepoAccess[];
   token?: string;
 }) {
-  const [instructions, setInstructions] = useState<BrandInstruction[]>(defaultInstructions);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-
-  useEffect(() => {
+  const initialState = (() => {
+    if (typeof window === "undefined") {
+      return { instructions: defaultInstructions, saveState: "idle" as SaveState };
+    }
     try {
       const raw = localStorage.getItem(storageKey);
-      if (!raw) return;
+      if (!raw) {
+        return { instructions: defaultInstructions, saveState: "idle" as SaveState };
+      }
       const parsed = JSON.parse(raw) as BrandInstruction[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setInstructions(parsed);
+        return { instructions: parsed, saveState: "idle" as SaveState };
       }
+      return { instructions: defaultInstructions, saveState: "idle" as SaveState };
     } catch {
-      setSaveState("error");
+      return { instructions: defaultInstructions, saveState: "error" as SaveState };
     }
-  }, []);
+  })();
+
+  const [instructions, setInstructions] = useState<BrandInstruction[]>(initialState.instructions);
+  const [saveState, setSaveState] = useState<SaveState>(initialState.saveState);
 
   const save = () => {
     try {

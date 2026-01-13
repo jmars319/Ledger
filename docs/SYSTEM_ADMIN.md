@@ -12,6 +12,7 @@ Primary admin pages
 - Inbox (`/inbox`): items awaiting review
 - Posts (`/posts/*`): review and status updates
 - Briefs (`/briefs`): create, list, and manage briefs
+- Content (`/content/*`): Content Ops intake and review
 - Schedules (`/schedules/*`): review schedule proposals
 - Tasks (`/tasks*`): manual posting tasks
 - Settings (`/settings`): repo access + integrations

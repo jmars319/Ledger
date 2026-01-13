@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 type StatusResponse = {
@@ -43,7 +43,7 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
   const errorNotice = searchParams.get("error");
   const installationIdParam = searchParams.get("installation_id");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -53,17 +53,17 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
       const statusBody = (await statusRes.json()) as StatusResponse;
       setStatus(statusBody);
 
-        if (statusBody.connected) {
-          const reposRes = await fetch("/api/github/repos", {
-            headers: authHeaders(token),
-          });
-          const reposBody = (await reposRes.json()) as { repos: Repo[] };
-          const filtered = (reposBody.repos ?? []).filter(
-            (repo) => repo.fullName.toLowerCase() !== "jason_marshall/ledger"
-          );
-          setRepos(filtered);
-          setSelectedIds(new Set(filtered.filter((repo) => repo.selected).map((repo) => repo.repoId)));
-        } else {
+      if (statusBody.connected) {
+        const reposRes = await fetch("/api/github/repos", {
+          headers: authHeaders(token),
+        });
+        const reposBody = (await reposRes.json()) as { repos: Repo[] };
+        const filtered = (reposBody.repos ?? []).filter(
+          (repo) => repo.fullName.toLowerCase() !== "jason_marshall/ledger"
+        );
+        setRepos(filtered);
+        setSelectedIds(new Set(filtered.filter((repo) => repo.selected).map((repo) => repo.repoId)));
+      } else {
         setRepos([]);
         setSelectedIds(new Set());
       }
@@ -72,11 +72,11 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     void load();
-  }, []);
+  }, [load]);
 
   useEffect(() => {
     if (!installationIdParam) return;
@@ -100,7 +100,7 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     };
 
     void complete();
-  }, [installationIdParam, token, router]);
+  }, [installationIdParam, token, router, load]);
 
   const toggleRepo = (repoId: number) => {
     setSelectedIds((prev) => {

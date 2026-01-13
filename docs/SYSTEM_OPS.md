@@ -3,6 +3,7 @@
 Runtime modes
 - Default: `STORAGE_MODE=memory` (no DB)
 - DB mode: `STORAGE_MODE=db` + `DATABASE_URL`
+- Content Ops is DB-only in Phase 1.
 
 Required env var names
 - `ADMIN_TOKEN`

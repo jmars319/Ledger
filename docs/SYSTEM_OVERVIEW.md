@@ -7,9 +7,10 @@ Pipeline
 2) Evidence capture (commits/PRs/releases/docs)
 3) Briefs (human or AI suggested)
 4) Posts (drafts) per platform
-5) Approval gates
-6) Schedules + manual tasks
-7) Audit logging
+5) Content Ops artifacts (Field Notes, Systems Memos, Blog Features)
+6) Approval gates
+7) Schedules + manual tasks
+8) Audit logging
 
 Core boundaries
 - Repo is read-only; Ledger never writes to GitHub.

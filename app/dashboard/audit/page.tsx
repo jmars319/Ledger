@@ -1,6 +1,7 @@
 import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import { getStore } from "@/lib/store";
+import { getAuditDisplay } from "@/lib/audit/labels";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -14,7 +15,7 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function AuditArchivePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; actor?: string }>;
 }) {
   const params = await searchParams;
   const token = params?.token;
@@ -69,20 +70,33 @@ export default async function AuditArchivePage({
           {logs.length === 0 ? (
             <div className="text-sm text-slate-500">No audit activity yet.</div>
           ) : (
-            logs.map((entry) => (
+            logs.map((entry) => {
+              const display = getAuditDisplay(entry.action);
+              return (
               <div
                 key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300"
+                className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-300"
               >
-                <div>
-                  <span className="font-semibold text-slate-100">{entry.action}</span>
-                  <span className="ml-2 text-slate-500">
-                    {entry.entityType} - {entry.entityId}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="font-semibold text-slate-100">{display.label}</div>
+                    <div className="text-xs text-slate-500">
+                      {entry.actor ?? "system"} · {new Date(entry.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500">{display.detail}</div>
                 </div>
-                <div className="text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString()}</div>
+                {entry.metadata ? (
+                  <details className="mt-2 text-xs text-slate-400">
+                    <summary className="cursor-pointer text-slate-500">Raw details</summary>
+                    <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-slate-800 bg-slate-900/60 p-2">
+                      {JSON.stringify(entry.metadata, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
               </div>
-            ))
+            );
+            })
           )}
         </div>
       </section>

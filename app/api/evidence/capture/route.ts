@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import { getPrismaClient } from "@/lib/prisma";
 import {
   fetchCommits,
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     where: { repoId, scope: "FULL" },
   });
 
-  let resolvedScope: "FULL" | "DAYS" | "COMMITS" =
+  const resolvedScope: "FULL" | "DAYS" | "COMMITS" =
     scope === "FULL"
       ? "FULL"
       : scope === "DAYS"
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
           : hasFull
             ? "DAYS"
             : "FULL";
-  let scopeValue = resolvedScope === "DAYS" ? days : resolvedScope === "COMMITS" ? commitWindowSize : null;
+  const scopeValue = resolvedScope === "DAYS" ? days : resolvedScope === "COMMITS" ? commitWindowSize : null;
   const scopePage = resolvedScope === "COMMITS" ? Math.max(commitWindowPage, 0) : null;
   const autoSelected = scope === "AUTO";
   const since = resolvedScope === "DAYS" ? daysToIso(days) : undefined;
@@ -109,8 +110,8 @@ export async function POST(request: Request) {
           body: item.body,
           url: item.url,
           occurredAt: new Date(item.occurredAt),
-          content: item.content,
-          metadata: item.metadata ?? {},
+          content: "content" in item ? item.content : undefined,
+          metadata: (item.metadata ?? {}) as Prisma.InputJsonValue,
         })),
       },
     },

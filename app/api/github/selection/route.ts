@@ -21,7 +21,7 @@ export async function POST(request: Request) {
       }
       return null;
     })
-    .filter((id: number | null): id is number => Number.isInteger(id) && id > 0);
+    .filter((id: number | null): id is number => typeof id === "number" && Number.isInteger(id) && id > 0);
 
   const prisma = getPrismaClient();
   const installation = await prisma.gitHubInstallation.findFirst({

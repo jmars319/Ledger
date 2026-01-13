@@ -1,6 +1,15 @@
-const { config } = require("dotenv");
-const { existsSync } = require("fs");
-const path = require("path");
+import { config } from "dotenv";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import { SignJWT, importPKCS8 } from "jose";
+import { createPrivateKey } from "node:crypto";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const repoRoot = path.resolve(__dirname, "..");
 const envPath = path.join(repoRoot, ".env");
@@ -38,30 +47,25 @@ if (!process.env.DATABASE_URL) {
   process.exit(0);
 }
 
-const { PrismaClient } = require("@prisma/client");
-const { PrismaPg } = require("@prisma/adapter-pg");
-const { Pool } = require("pg");
-const { SignJWT, importPKCS8 } = require("jose");
+const normalizePem = (value = "") => value.replace(/\\n/g, "\n").replace(/^"|"$/g, "");
 
-const normalizePem = (value) =>
-  value.replace(/\\n/g, "\n").replace(/^"|"$/g, "");
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
-(async () => {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+try {
+  const installation = await prisma.gitHubInstallation.findFirst({
+    orderBy: { createdAt: "desc" },
+  });
 
-  try {
-    const installation = await prisma.gitHubInstallation.findFirst({
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!installation) {
-      console.log("github-smoke: SKIP (no installation)");
-      return;
-    }
-
+  if (!installation) {
+    console.log("github-smoke: SKIP (no installation)");
+  } else {
     const appId = process.env.GITHUB_APP_ID;
-    const privateKey = await importPKCS8(normalizePem(process.env.GITHUB_PRIVATE_KEY_PEM), "RS256");
+    const pem = normalizePem(process.env.GITHUB_PRIVATE_KEY_PEM);
+    const pkcs8Pem = pem.includes("BEGIN RSA PRIVATE KEY")
+      ? createPrivateKey(pem).export({ type: "pkcs8", format: "pem" }).toString()
+      : pem;
+    const privateKey = await importPKCS8(pkcs8Pem, "RS256");
     const jwt = await new SignJWT({})
       .setProtectedHeader({ alg: "RS256" })
       .setIssuedAt()
@@ -86,22 +90,20 @@ const normalizePem = (value) =>
       const text = await res.text();
       console.error(`github-smoke: FAILED (${res.status}) ${text}`);
       process.exitCode = 1;
-      return;
+    } else {
+      const data = await res.json();
+      if (!data.token) {
+        console.error("github-smoke: FAILED (missing token)");
+        process.exitCode = 1;
+      } else {
+        console.log("github-smoke: OK");
+      }
     }
-
-    const data = await res.json();
-    if (!data.token) {
-      console.error("github-smoke: FAILED (missing token)");
-      process.exitCode = 1;
-      return;
-    }
-
-    console.log("github-smoke: OK");
-  } catch (error) {
-    console.error("github-smoke: FAILED", error);
-    process.exitCode = 1;
-  } finally {
-    await prisma.$disconnect();
-    await pool.end();
   }
-})();
+} catch (err) {
+  console.error("github-smoke: FAILED", err);
+  process.exitCode = 1;
+} finally {
+  await prisma.$disconnect();
+  await pool.end();
+}
