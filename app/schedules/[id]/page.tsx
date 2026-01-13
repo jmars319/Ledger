@@ -4,6 +4,7 @@ import PurposeCard from "@/app/components/PurposeCard";
 import ReviewActions from "@/app/components/ReviewActions";
 import { getStore } from "@/lib/store";
 import { notFound } from "next/navigation";
+import type { ScheduleItem } from "@/lib/store/types";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function SchedulePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; status?: string; type?: string }>;
 }) {
   const resolvedParams = await params;
   const queryParams = await searchParams;
@@ -64,7 +65,7 @@ export default async function SchedulePage({
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Proposed items</div>
           <div className="mt-4 grid gap-3">
-            {schedule.items.map((item: any) => (
+            {schedule.items.map((item: ScheduleItem) => (
               <div
                 key={item.id}
                 className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200"

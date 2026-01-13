@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import ReviewActions from "@/app/components/ReviewActions";
+import PostSchedulePanel from "@/app/posts/PostSchedulePanel";
 import { getStore } from "@/lib/store";
 import { notFound } from "next/navigation";
 
@@ -12,7 +13,7 @@ export default async function PostPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; status?: string; type?: string }>;
 }) {
   const resolvedParams = await params;
   const queryParams = await searchParams;
@@ -87,7 +88,10 @@ export default async function PostPage({
             ))}
           </ul>
         </div>
-        <ReviewActions id={post.id} kind="posts" token={token} />
+        <div className="space-y-4">
+          <ReviewActions id={post.id} kind="posts" token={token} />
+          <PostSchedulePanel postId={post.id} postStatus={post.status} token={token} />
+        </div>
       </section>
     </PageShell>
   );

@@ -3,6 +3,7 @@ import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import TaskActions from "@/app/components/TaskActions";
 import { getStore } from "@/lib/store";
+import type { Task } from "@/lib/store/types";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -16,7 +17,7 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; status?: string }>;
 }) {
   const params = await searchParams;
   const token = params?.token;
@@ -77,7 +78,7 @@ export default async function TasksPage({
         ))}
       </section>
       <section className="grid gap-4">
-        {tasks.map((task: any) => (
+        {tasks.map((task: Task) => (
           <div
             key={task.id}
             className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/40 p-5 md:flex-row md:items-center md:justify-between"

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Brief, RepoAccess } from "@/lib/store/types";
+import { stylePresets } from "@/lib/content/stylePresets";
 
 type BrandInstruction = {
   id: string;
@@ -32,6 +33,7 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
   const [platformMode, setPlatformMode] = useState<"single" | "multi">("single");
   const [platform, setPlatform] = useState<string>("generic");
   const [multiPlatforms, setMultiPlatforms] = useState<Set<string>>(new Set());
+  const [stylePresetId, setStylePresetId] = useState(stylePresets[0]?.id ?? "neutral-brief");
   const [singleRepoId, setSingleRepoId] = useState<string>(repos[0]?.id ?? "");
   const [multiRepoIds, setMultiRepoIds] = useState<Set<string>>(new Set());
   const [brandOverride, setBrandOverride] = useState<string>("");
@@ -141,6 +143,7 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
             briefId,
             platform,
             repoIds,
+            stylePresetId,
             brandTag: selectedBrandTag || undefined,
             instructions: selectedInstructions || undefined,
           }
@@ -148,6 +151,7 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
             briefId,
             platforms: selectedPlatforms,
             repoIds,
+            stylePresetId,
             brandTag: selectedBrandTag || undefined,
             instructions: selectedInstructions || undefined,
           };
@@ -296,6 +300,26 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
               ))}
             </div>
           )}
+        </div>
+        <div className="mt-4">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Style preset</div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            {stylePresets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setStylePresetId(preset.id)}
+                className={`rounded-xl border px-4 py-3 text-left text-sm ${
+                  stylePresetId === preset.id
+                    ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-100"
+                    : "border-slate-800 bg-slate-950/40 text-slate-300"
+                }`}
+              >
+                <div className="font-semibold">{preset.name}</div>
+                <div className="mt-1 text-xs text-slate-400">{preset.description}</div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

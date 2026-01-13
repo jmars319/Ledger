@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generatePost } from "@/lib/ai/generatePost";
+import { getStylePreset } from "@/lib/content/stylePresets";
 
 type Platform =
   | "twitter"
@@ -67,12 +68,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "briefId is required." }, { status: 400 });
   }
 
-  const platforms = Array.isArray(body.platforms)
+  const platforms: Platform[] = Array.isArray(body.platforms)
     ? Array.from(new Set(body.platforms.map((value: string) => normalizePlatform(value))))
     : [];
   const repoIds = Array.isArray(body.repoIds)
     ? body.repoIds.filter((id: unknown) => typeof id === "string" && id.trim().length > 0)
     : [];
+  const stylePresetId = typeof body.stylePresetId === "string" ? body.stylePresetId : "";
   const brandTag = typeof body.brandTag === "string" ? body.brandTag : undefined;
   const instructions =
     body.instructions && typeof body.instructions === "object"
@@ -132,6 +134,7 @@ export async function POST(request: Request) {
       : [];
     const evidenceItems = [...evidenceDocs, ...evidenceRecent];
 
+    const stylePreset = getStylePreset(stylePresetId);
     const postTexts = await Promise.all(
       platforms.map(async (platform) =>
         generatePost({
@@ -144,6 +147,7 @@ export async function POST(request: Request) {
             body: item.body,
             content: item.content,
           })),
+          stylePreset,
           brandInstructions:
             instructions ??
             (brandTag ? { tag: brandTag } : repoTags[0] ? { tag: repoTags[0] } : undefined),
@@ -165,6 +169,7 @@ export async function POST(request: Request) {
                 platform,
                 source: "openai",
                 model: "gpt-5-mini",
+                stylePresetId: stylePreset.id,
                 repoIds,
                 repoNames,
                 brandTag: brandTag ?? instructions?.tag,
@@ -191,6 +196,7 @@ export async function POST(request: Request) {
                 model: "gpt-5-mini",
                 repoIds,
                 repoNames,
+                stylePresetId: stylePreset.id,
               },
             },
           })

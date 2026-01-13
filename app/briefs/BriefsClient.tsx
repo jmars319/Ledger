@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Brief, Project, RepoAccess } from "@/lib/store/types";
+import { stylePresets } from "@/lib/content/stylePresets";
 
 type Props = {
   briefs: Brief[];
@@ -19,7 +21,9 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
   const [summary, setSummary] = useState("");
   const [sourceRepoId, setSourceRepoId] = useState<string>("");
   const [generalPrompt, setGeneralPrompt] = useState("");
+  const [generalFiles, setGeneralFiles] = useState<File[]>([]);
   const [repoId, setRepoId] = useState(repos[0]?.id ?? "");
+  const [stylePresetId, setStylePresetId] = useState(stylePresets[0]?.id ?? "neutral-brief");
   const [scopeMode, setScopeMode] = useState<"AUTO" | "FULL" | "DAYS" | "COMMITS">("AUTO");
   const [days, setDays] = useState("30");
   const [commitWindowSize, setCommitWindowSize] = useState("50");
@@ -41,6 +45,7 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
   const [filterScope, setFilterScope] = useState<"all" | "general" | "repo">("all");
   const [filterRepo, setFilterRepo] = useState<string>("all");
   const [activeSummary, setActiveSummary] = useState<string | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
 
   const instructions = useMemo(() => {
     try {
@@ -51,6 +56,19 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
     } catch {
       return [];
     }
+  }, []);
+
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const res = await fetch("/api/ai/status");
+        const data = await res.json();
+        setAiConfigured(Boolean(data?.configured));
+      } catch {
+        setAiConfigured(false);
+      }
+    };
+    void loadStatus();
   }, []);
 
   const repoBrand = repos.find((repo) => repo.id === repoId)?.projectTag;
@@ -127,6 +145,11 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
       setSuggestError("Select a repo.");
       return;
     }
+    if (aiConfigured === false) {
+      setSuggestState("error");
+      setSuggestError("AI Assist is not configured.");
+      return;
+    }
     if (!useDocs && !useCommits && !usePulls && !useReleases) {
       setSuggestState("error");
       setSuggestError("Select at least one evidence source.");
@@ -175,6 +198,7 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
       },
       body: JSON.stringify({
         bundleId,
+        stylePresetId,
         instructions: brandInstructions ?? undefined,
       }),
     });
@@ -194,21 +218,28 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
   const suggestGeneralBrief = async () => {
     setGeneralSuggestState("loading");
     setGeneralSuggestError(null);
-    if (!generalPrompt.trim()) {
+    if (!generalPrompt.trim() && generalFiles.length === 0) {
       setGeneralSuggestState("error");
-      setGeneralSuggestError("Enter a brief prompt.");
+      setGeneralSuggestError("Enter a brief prompt or upload files.");
+      return;
+    }
+    if (aiConfigured === false) {
+      setGeneralSuggestState("error");
+      setGeneralSuggestError("AI Assist is not configured.");
       return;
     }
 
-    const suggestRes = await fetch("/api/ai/brief-suggest-text", {
+    const formData = new FormData();
+    formData.set("promptText", generalPrompt.trim());
+    formData.set("stylePresetId", stylePresetId);
+    generalFiles.forEach((file) => formData.append("files", file));
+
+    const suggestRes = await fetch("/api/ai/brief-draft", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         ...authHeaders(token),
       },
-      body: JSON.stringify({
-        promptText: generalPrompt.trim(),
-      }),
+      body: formData,
     });
 
     if (!suggestRes.ok) {
@@ -232,6 +263,11 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
     if (filterRepo !== "all" && brief.sourceRepoId !== filterRepo) return false;
     return true;
   });
+
+  const withParams = (href: string) => {
+    if (!token) return href;
+    return `${href}?token=${encodeURIComponent(token)}`;
+  };
 
   return (
     <div className="grid gap-6">
@@ -282,6 +318,20 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
         </div>
         <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
           <div className="text-xs uppercase tracking-wide text-slate-500">Suggest from repo</div>
+          <label className="mt-3 grid gap-2 text-xs text-slate-400">
+            Style preset
+            <select
+              value={stylePresetId}
+              onChange={(event) => setStylePresetId(event.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-100"
+            >
+              {stylePresets.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name} — {preset.description}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="mt-3 grid gap-4 md:grid-cols-2">
             <label className="grid gap-2 text-xs text-slate-400">
               Repo
@@ -393,11 +443,15 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={suggestBrief}
+              disabled={aiConfigured === false}
               className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
             >
               {suggestState === "loading" ? "Generating..." : "Suggest brief"}
             </button>
             {suggestError ? <div className="text-xs text-rose-300">{suggestError}</div> : null}
+            {aiConfigured === false ? (
+              <div className="text-xs text-slate-500">AI Assist is not configured.</div>
+            ) : null}
           </div>
           {evidenceBundleId ? (
             <div className="mt-2 text-xs text-slate-500">Evidence bundle: {evidenceBundleId}</div>
@@ -415,15 +469,32 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
               placeholder="e.g. Brief about the three most important things I have learned in the last month."
             />
           </label>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            <input
+              type="file"
+              multiple
+              onChange={(event) => setGeneralFiles(Array.from(event.target.files ?? []))}
+              className="text-xs text-slate-300"
+            />
+            {generalFiles.length ? (
+              <span className="text-xs text-slate-500">
+                Files: {generalFiles.map((file) => file.name).join(", ")}
+              </span>
+            ) : null}
+          </div>
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={suggestGeneralBrief}
+              disabled={aiConfigured === false}
               className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
             >
               {generalSuggestState === "loading" ? "Generating..." : "Suggest general brief"}
             </button>
             {generalSuggestError ? (
               <div className="text-xs text-rose-300">{generalSuggestError}</div>
+            ) : null}
+            {aiConfigured === false ? (
+              <div className="text-xs text-slate-500">AI Assist is not configured.</div>
             ) : null}
           </div>
         </div>
@@ -480,18 +551,27 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
                   <div className="text-xs uppercase tracking-wide text-slate-500">
                     Project: {projects.find((p) => p.id === brief.projectId)?.name ?? "Unknown"}
                   </div>
-                  <button
-                    onClick={() => removeBrief(brief.id)}
-                    className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-slate-500"
-                  >
-                    Delete
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={withParams(`/briefs/${brief.id}`)}
+                      className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-slate-500"
+                    >
+                      Open
+                    </Link>
+                    <button
+                      onClick={() => removeBrief(brief.id)}
+                      className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:border-slate-500"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-1 text-xs text-slate-400">
                   {brief.sourceRepoId
                     ? `Repo: ${repos.find((repo) => repo.id === brief.sourceRepoId)?.repo ?? "Unknown"}`
                     : "General brief"}
                 </div>
+                <div className="mt-1 text-xs text-slate-500">Status: saved</div>
                 <div className="mt-2 whitespace-pre-wrap text-sm text-slate-100">
                   {brief.summary}
                 </div>

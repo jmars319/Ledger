@@ -1,20 +1,31 @@
 import "server-only";
-import { openai } from "@/lib/ai/client";
+import { getOpenAI } from "@/lib/ai/client";
+import type { StylePreset } from "@/lib/content/stylePresets";
+import { buildInstructionBlock } from "@/lib/ai/instructions";
 
-export async function generateBriefFromText(input: { promptText: string }): Promise<string> {
+export async function generateBriefFromText(input: {
+  promptText: string;
+  stylePreset?: StylePreset;
+}): Promise<string> {
   const promptText = input.promptText.trim();
   if (!promptText) {
     throw new Error("promptText is required.");
   }
+
+  const instructionBlock = buildInstructionBlock({
+    style: input.stylePreset,
+    context: ["General brief request"],
+  });
 
   const prompt =
     "You are a project assistant. Produce a concise, general brief for human review.\n" +
     "Output plain text only. Avoid claims that cannot be supported.\n" +
     "Focus on what changed/learned, why it matters, and constraints.\n" +
     "If the prompt is broad, propose 3-5 concrete angles.\n\n" +
+    `${instructionBlock.block}\n\n` +
     `Prompt:\n${promptText}\n\nBrief:`;
 
-  const response = await openai.responses.create({
+  const response = await getOpenAI().responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

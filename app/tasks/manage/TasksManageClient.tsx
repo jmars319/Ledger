@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Project, Task } from "@/lib/store/types";
 
 type Props = {
@@ -18,8 +18,24 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
   const [title, setTitle] = useState("");
   const [dueAt, setDueAt] = useState("");
   const [copyText, setCopyText] = useState("");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const res = await fetch("/api/ai/status");
+        const data = await res.json();
+        setAiConfigured(Boolean(data?.configured));
+      } catch {
+        setAiConfigured(false);
+      }
+    };
+    void loadStatus();
+  }, []);
 
   const submit = async () => {
     setState("saving");
@@ -69,10 +85,75 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
     setState("idle");
   };
 
+  const suggestTask = async () => {
+    setAiError(null);
+    if (!aiPrompt.trim()) {
+      setAiError("Enter a task prompt.");
+      return;
+    }
+    if (!aiConfigured) {
+      setAiError("AI Assist is not configured.");
+      return;
+    }
+
+    const res = await fetch("/api/ai/tasks/suggest", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(token),
+      },
+      body: JSON.stringify({
+        promptText: aiPrompt.trim(),
+        projectId,
+      }),
+    });
+
+    const payload = await res.json();
+    if (!res.ok || !payload.ok) {
+      setAiError(payload.error ?? "AI task suggestion failed.");
+      return;
+    }
+
+    setTitle(payload.suggestion?.title ?? "");
+    setCopyText(payload.suggestion?.copyText ?? "");
+    if (payload.suggestion?.dueAt) {
+      const iso = payload.suggestion.dueAt;
+      const date = new Date(iso);
+      if (!Number.isNaN(date.getTime())) {
+        setDueAt(date.toISOString().slice(0, 16));
+      }
+    }
+  };
+
   return (
     <div className="grid gap-6">
       <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
         <div className="text-sm font-semibold text-slate-200">Create task</div>
+        <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+          <div className="text-xs uppercase tracking-wide text-slate-500">AI task draft</div>
+          <label className="mt-3 grid gap-2 text-xs text-slate-400">
+            Prompt
+            <textarea
+              rows={2}
+              value={aiPrompt}
+              onChange={(event) => setAiPrompt(event.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100"
+              placeholder="e.g. Prepare manual posting checklist for approved LinkedIn post."
+            />
+          </label>
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={suggestTask}
+              className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
+            >
+              Suggest task
+            </button>
+            {aiError ? <div className="text-xs text-rose-300">{aiError}</div> : null}
+            {aiConfigured === false ? (
+              <div className="text-xs text-slate-500">AI Assist is not configured.</div>
+            ) : null}
+          </div>
+        </div>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="grid gap-2 text-xs text-slate-400">
             Project

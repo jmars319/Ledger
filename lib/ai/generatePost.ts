@@ -1,5 +1,7 @@
 import "server-only";
-import { openai } from "@/lib/ai/client";
+import { getOpenAI } from "@/lib/ai/client";
+import type { StylePreset } from "@/lib/content/stylePresets";
+import { buildInstructionBlock } from "@/lib/ai/instructions";
 
 type PostInput = {
   briefText: string;
@@ -32,6 +34,7 @@ type PostInput = {
     doList?: string;
     dontList?: string;
   };
+  stylePreset?: StylePreset;
 };
 
 const platformInstructions: Record<NonNullable<PostInput["platform"]>, string> = {
@@ -78,31 +81,26 @@ export async function generatePost(input: PostInput): Promise<string> {
         })
         .join("\n\n---\n\n")
     : "No evidence items provided.";
-  const brand = input.brandInstructions;
-  const brandBlock = brand
-    ? [
-        `Brand tag: ${brand.tag ?? "unknown"}`,
-        `Tone: ${brand.tone ?? "none"}`,
-        `Hard rules: ${brand.hardRules ?? "none"}`,
-        `Do: ${brand.doList ?? "none"}`,
-        `Don't: ${brand.dontList ?? "none"}`,
-      ].join("\n")
-    : "Brand instructions: none provided.";
+  const instructionBlock = buildInstructionBlock({
+    style: input.stylePreset,
+    org: input.brandInstructions,
+    context: [`Platform: ${platform}`],
+  });
   const prompt =
     "You are drafting a social media post for a human review workflow.\n" +
     "The output must be plain text only. No markdown, no JSON, no hashtags unless explicitly asked.\n" +
     "Avoid claims of automation or posting. Keep it factual and reviewable.\n\n" +
     `Platform guidance: ${platformInstructions[platform]}\n\n` +
+    `${instructionBlock.block}\n\n` +
     `${repoLine}\n` +
     "Use repo names only for context; do not assume repository contents.\n" +
     "Use evidence items to ground claims; do not invent details beyond evidence and the brief.\n\n" +
     "Evidence:\n" +
     `${evidenceBlock}\n\n` +
-    `${brandBlock}\n\n` +
     `Brief:\n${briefText}\n\n` +
     "Post:";
 
-  const response = await openai.responses.create({
+  const response = await getOpenAI().responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

@@ -94,6 +94,7 @@ export type StorageAdapter = {
   listInbox(): Promise<InboxSummary>;
   listProjects(): Promise<Project[]>;
   listBriefs(): Promise<Brief[]>;
+  getBrief(id: string): Promise<Brief | null>;
   listPosts(): Promise<Post[]>;
   getPost(id: string): Promise<Post | null>;
   updatePostStatus(id: string, status: PostStatus, note?: string): Promise<Post | null>;

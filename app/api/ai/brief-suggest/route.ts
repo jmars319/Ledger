@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generateBrief } from "@/lib/ai/generateBrief";
+import { getStylePreset } from "@/lib/content/stylePresets";
 
 export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
@@ -9,6 +10,7 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const bundleId = typeof body?.bundleId === "string" ? body.bundleId : "";
+  const stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : "";
   const instructions =
     body.instructions && typeof body.instructions === "object"
       ? {
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
       autoSelected: bundle.autoSelected,
       fullCoverageComplete: Boolean(fullCoverage),
     },
+    stylePreset: getStylePreset(stylePresetId),
     brandInstructions: instructions,
   });
 

@@ -250,6 +250,10 @@ export const createMemoryStore = (): StorageAdapter => ({
     return [...data.briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
 
+  async getBrief(id: string) {
+    return data.briefs.find((brief) => brief.id === id) ?? null;
+  },
+
   async listPosts() {
     return data.posts;
   },

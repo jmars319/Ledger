@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 
 export async function DELETE(
-  _request: Request,
-  { params }: { params: { id: string } }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Briefs require STORAGE_MODE=db." }, { status: 400 });
   }
 
-  const id = params?.id;
   if (!id) {
     return NextResponse.json({ error: "Brief id is required." }, { status: 400 });
   }

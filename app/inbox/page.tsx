@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
+import type { Post, ScheduleProposal } from "@/lib/store/types";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -15,7 +16,7 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; type?: string }>;
 }) {
   const params = await searchParams;
   const token = params?.token;
@@ -39,20 +40,20 @@ export default async function InboxPage({
     <PageShell
       token={token}
       title="Inbox"
-      subtitle="Items waiting for review."
+      subtitle="Review queue for posts and schedule proposals."
       actions={
         <div className="flex flex-wrap gap-2">
           <Link
             href={newPostLink}
             className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
           >
-            New post
+            Generate post
           </Link>
           <Link
             href={manageSchedulesLink}
             className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
           >
-            New schedule
+            Create schedule
           </Link>
           <Link
             href={archiveLink}
@@ -64,7 +65,7 @@ export default async function InboxPage({
       }
     >
       <PurposeCard>
-        Review posts and schedule proposals that require a human decision before they move forward.
+        This is the review gate. Approve, request revisions, or reject before anything moves forward.
       </PurposeCard>
       <section className="flex flex-wrap gap-2">
         {[
@@ -80,11 +81,14 @@ export default async function InboxPage({
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Posts</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Drafted posts waiting for a human review decision.
+          </div>
           <div className="mt-4 grid gap-3">
             {posts.length === 0 ? (
               <div className="text-sm text-slate-500">No posts awaiting review.</div>
             ) : (
-              posts.map((post: any) => (
+              posts.map((post: Post) => (
                 <Link
                   key={post.id}
                   href={withParams(`/posts/${post.id}`, {
@@ -103,11 +107,14 @@ export default async function InboxPage({
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Schedules</div>
+          <div className="mt-1 text-xs text-slate-500">
+            Proposed timing for approved posts. Review before approving.
+          </div>
           <div className="mt-4 grid gap-3">
             {schedules.length === 0 ? (
               <div className="text-sm text-slate-500">No schedules awaiting review.</div>
             ) : (
-              schedules.map((schedule: any) => (
+              schedules.map((schedule: ScheduleProposal) => (
                 <Link
                   key={schedule.id}
                   href={withParams(`/schedules/${schedule.id}`, {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generatePost } from "@/lib/ai/generatePost";
+import { getStylePreset } from "@/lib/content/stylePresets";
 
 type Platform =
   | "twitter"
@@ -71,6 +72,7 @@ export async function POST(request: Request) {
   const repoIds = Array.isArray(body.repoIds)
     ? body.repoIds.filter((id: unknown) => typeof id === "string" && id.trim().length > 0)
     : [];
+  const stylePresetId = typeof body.stylePresetId === "string" ? body.stylePresetId : "";
   const brandTag = typeof body.brandTag === "string" ? body.brandTag : undefined;
   const instructions =
     body.instructions && typeof body.instructions === "object"
@@ -126,6 +128,7 @@ export async function POST(request: Request) {
       : [];
     const evidenceItems = [...evidenceDocs, ...evidenceRecent];
 
+    const stylePreset = getStylePreset(stylePresetId);
     const text = await generatePost({
       briefText: brief.summary,
       platform,
@@ -136,6 +139,7 @@ export async function POST(request: Request) {
         body: item.body,
         content: item.content,
       })),
+      stylePreset,
       brandInstructions:
         instructions ?? (brandTag ? { tag: brandTag } : repoTags[0] ? { tag: repoTags[0] } : undefined),
     });
@@ -151,6 +155,7 @@ export async function POST(request: Request) {
           platform,
           source: "openai",
           model: "gpt-5-mini",
+          stylePresetId: stylePreset.id,
           repoIds,
           repoNames,
           brandTag: brandTag ?? instructions?.tag,
@@ -167,7 +172,7 @@ export async function POST(request: Request) {
         entityType: "Post",
         entityId: post.id,
         note: `Post generated for brief ${brief.id}.`,
-        metadata: { briefId: brief.id, platform, model: "gpt-5-mini", repoIds, repoNames },
+        metadata: { briefId: brief.id, platform, model: "gpt-5-mini", repoIds, repoNames, stylePresetId: stylePreset.id },
       },
     });
 

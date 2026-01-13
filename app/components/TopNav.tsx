@@ -2,11 +2,10 @@ import Link from "next/link";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/inbox", label: "Inbox" },
+  { href: "/content", label: "Content" },
   { href: "/briefs", label: "Briefs" },
-  { href: "/posts/new", label: "New Post" },
-  { href: "/projects", label: "Projects" },
-  { href: "/tasks", label: "Tasks" },
+  { href: "/inbox", label: "Inbox" },
+  { href: "/schedules/manage", label: "Schedules" },
   { href: "/settings", label: "Settings" },
 ];
 

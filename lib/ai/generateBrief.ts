@@ -1,5 +1,7 @@
 import "server-only";
-import { openai } from "@/lib/ai/client";
+import { getOpenAI } from "@/lib/ai/client";
+import type { StylePreset } from "@/lib/content/stylePresets";
+import { buildInstructionBlock } from "@/lib/ai/instructions";
 
 type EvidenceItem = {
   type: string;
@@ -23,6 +25,7 @@ export async function generateBrief(input: {
     autoSelected?: boolean;
     fullCoverageComplete?: boolean;
   };
+  stylePreset?: StylePreset;
   brandInstructions?: {
     tag?: string;
     tone?: string;
@@ -50,16 +53,11 @@ export async function generateBrief(input: {
     })
     .join("\n\n---\n\n");
 
-  const brand = input.brandInstructions;
-  const brandBlock = brand
-    ? [
-        `Brand tag: ${brand.tag ?? "unknown"}`,
-        `Tone: ${brand.tone ?? "none"}`,
-        `Hard rules: ${brand.hardRules ?? "none"}`,
-        `Do: ${brand.doList ?? "none"}`,
-        `Don't: ${brand.dontList ?? "none"}`,
-      ].join("\n")
-    : "Brand instructions: none provided.";
+  const instructionBlock = buildInstructionBlock({
+    style: input.stylePreset,
+    org: input.brandInstructions,
+    context: [`Repo: ${input.repoFullName}`],
+  });
 
   const coverage = input.coverage;
   const coverageLine = coverage
@@ -88,16 +86,16 @@ export async function generateBrief(input: {
     "If multiple notable features exist, call out each separately and suggest a multi-post plan.\n" +
     "If evidence seems thin for a complete brief, say so and suggest moving to the next chunk.\n" +
     "Include a question asking which repo should be next for scheduling.\n\n" +
+    `${instructionBlock.block}\n\n` +
     `Repo: ${input.repoFullName}\n` +
     `${coverageLine}\n` +
     `${fullCoverageNote}\n` +
     `${chunkNote}\n` +
-    `${brandBlock}\n\n` +
     "Evidence:\n" +
     items +
     "\n\nBrief:";
 
-  const response = await openai.responses.create({
+  const response = await getOpenAI().responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

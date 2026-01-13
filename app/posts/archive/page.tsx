@@ -15,7 +15,7 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function PostArchivePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string }>;
+  searchParams?: Promise<{ token?: string; status?: string }>;
 }) {
   const params = await searchParams;
   const token = params?.token;

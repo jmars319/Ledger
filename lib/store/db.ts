@@ -2,6 +2,7 @@ import { getPrismaClient } from "@/lib/prisma";
 import type {
   AuditLog as PrismaAuditLog,
   Brief as PrismaBrief,
+  Prisma,
   Post as PrismaPost,
   RepoAccess as PrismaRepoAccess,
   ScheduleItem as PrismaScheduleItem,
@@ -28,7 +29,7 @@ const mapPost = (post: PrismaPost): Post => ({
   platform: post.platform,
   title: post.title,
   status: post.status,
-  postJson: post.postJson ?? {},
+  postJson: (post.postJson ?? {}) as Record<string, unknown>,
   claims: post.claims ?? [],
   createdAt: post.createdAt.toISOString(),
   updatedAt: post.updatedAt.toISOString(),
@@ -75,7 +76,7 @@ const mapAudit = (audit: PrismaAuditLog): AuditLog => ({
   entityType: audit.entityType,
   entityId: audit.entityId,
   note: audit.note ?? undefined,
-  metadata: audit.metadata ?? undefined,
+  metadata: (audit.metadata as Record<string, unknown> | null) ?? undefined,
 });
 
 const mapBrief = (brief: PrismaBrief) => ({
@@ -96,7 +97,7 @@ const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
       entityType: entry.entityType,
       entityId: entry.entityId,
       note: entry.note,
-      metadata: entry.metadata,
+      metadata: (entry.metadata ?? undefined) as Prisma.InputJsonValue | undefined,
     },
   });
 };
@@ -151,6 +152,12 @@ export const createDbStore = (): StorageAdapter => ({
     const prisma = getPrismaClient();
     const briefs = await prisma.brief.findMany({ orderBy: { createdAt: "desc" } });
     return briefs.map(mapBrief);
+  },
+
+  async getBrief(id: string) {
+    const prisma = getPrismaClient();
+    const brief = await prisma.brief.findUnique({ where: { id } });
+    return brief ? mapBrief(brief) : null;
   },
 
   async listPosts() {
