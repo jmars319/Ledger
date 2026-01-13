@@ -21,6 +21,7 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [state, setState] = useState<"idle" | "saving" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +97,7 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
       return;
     }
 
+    setAiLoading(true);
     const res = await fetch("/api/ai/tasks/suggest", {
       method: "POST",
       headers: {
@@ -111,6 +113,7 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
     const payload = await res.json();
     if (!res.ok || !payload.ok) {
       setAiError(payload.error ?? "AI task suggestion failed.");
+      setAiLoading(false);
       return;
     }
 
@@ -123,6 +126,7 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
         setDueAt(date.toISOString().slice(0, 16));
       }
     }
+    setAiLoading(false);
   };
 
   return (
@@ -144,10 +148,12 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={suggestTask}
-              className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
+              disabled={aiLoading}
+              className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200 disabled:opacity-60"
             >
-              Suggest task
+              {aiLoading ? "Working..." : "Suggest task"}
             </button>
+            {aiLoading ? <div className="text-xs text-slate-500">Working...</div> : null}
             {aiError ? <div className="text-xs text-rose-300">{aiError}</div> : null}
             {aiConfigured === false ? (
               <div className="text-xs text-slate-500">AI Assist is not configured.</div>

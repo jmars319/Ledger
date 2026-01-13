@@ -443,11 +443,14 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={suggestBrief}
-              disabled={aiConfigured === false}
+              disabled={aiConfigured === false || suggestState === "loading"}
               className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
             >
               {suggestState === "loading" ? "Generating..." : "Suggest brief"}
             </button>
+            {suggestState === "loading" ? (
+              <div className="text-xs text-slate-500">Working...</div>
+            ) : null}
             {suggestError ? <div className="text-xs text-rose-300">{suggestError}</div> : null}
             {aiConfigured === false ? (
               <div className="text-xs text-slate-500">AI Assist is not configured.</div>
@@ -485,11 +488,14 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
           <div className="mt-3 flex items-center gap-3">
             <button
               onClick={suggestGeneralBrief}
-              disabled={aiConfigured === false}
+              disabled={aiConfigured === false || generalSuggestState === "loading"}
               className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200"
             >
               {generalSuggestState === "loading" ? "Generating..." : "Suggest general brief"}
             </button>
+            {generalSuggestState === "loading" ? (
+              <div className="text-xs text-slate-500">Working...</div>
+            ) : null}
             {generalSuggestError ? (
               <div className="text-xs text-rose-300">{generalSuggestError}</div>
             ) : null}

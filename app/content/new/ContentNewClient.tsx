@@ -412,6 +412,7 @@ export default function ContentNewClient({ token }: { token?: string }) {
           >
             {generating ? "Generating..." : "Generate draft"}
           </button>
+          {generating ? <div className="text-xs text-slate-500">Working...</div> : null}
         </div>
         {uploadFiles.length ? (
           <div className="mt-2 text-xs text-slate-400">

@@ -431,10 +431,11 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
         <button
           onClick={submit}
           disabled={state === "submitting" || briefs.length === 0 || repos.length === 0}
-          className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200"
+          className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 disabled:opacity-60"
         >
           {state === "submitting" ? "Generating..." : "Generate post"}
         </button>
+        {state === "submitting" ? <div className="text-xs text-slate-500">Working...</div> : null}
         {error ? <div className="text-xs text-rose-300">{error}</div> : null}
       </div>
       {createdPosts.length ? (

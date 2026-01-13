@@ -10,6 +10,8 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
   const [suggested, setSuggested] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
 
   const apiFetch = (url: string, init: RequestInit) => {
     const headers = new Headers(init.headers || {});
@@ -20,6 +22,7 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
   const requestAssist = async () => {
     setError(null);
     setStatus(null);
+    setLoading(true);
     const res = await apiFetch(`/api/content/items/${id}/assist`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,14 +31,17 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
     const data = await res.json();
     if (!res.ok || !data.ok) {
       setError(data?.validation?.errors?.[0]?.message || data.error || "Assist failed.");
+      setLoading(false);
       return;
     }
     setPreview(data.preview);
     setSuggested(data.suggested);
+    setLoading(false);
   };
 
   const applyAssist = async () => {
     if (!suggested) return;
+    setApplyLoading(true);
     const res = await apiFetch(`/api/content/items/${id}/assist`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -44,9 +50,11 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
     const data = await res.json();
     if (!res.ok || !data.ok) {
       setError(data?.validation?.errors?.[0]?.message || data.error || "Apply failed.");
+      setApplyLoading(false);
       return;
     }
     setStatus("Applied suggestions.");
+    setApplyLoading(false);
   };
 
   return (
@@ -66,11 +74,13 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
         ))}
         <button
           onClick={requestAssist}
-          className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-200"
+          disabled={loading}
+          className="rounded-full border border-slate-700 px-3 py-1 text-xs text-slate-200 disabled:opacity-60"
         >
-          Preview suggestions
+          {loading ? "Working..." : "Preview suggestions"}
         </button>
       </div>
+      {loading ? <div className="mt-3 text-xs text-slate-500">Working...</div> : null}
 
       {error ? <div className="mt-3 text-xs text-rose-200">{error}</div> : null}
       {status ? <div className="mt-3 text-xs text-emerald-300">{status}</div> : null}
@@ -91,9 +101,10 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
           </div>
           <button
             onClick={applyAssist}
-            className="rounded-full border border-emerald-400/60 px-3 py-1 text-xs text-emerald-200"
+            disabled={applyLoading}
+            className="rounded-full border border-emerald-400/60 px-3 py-1 text-xs text-emerald-200 disabled:opacity-60"
           >
-            Apply changes
+            {applyLoading ? "Working..." : "Apply changes"}
           </button>
         </div>
       ) : null}
