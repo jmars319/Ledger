@@ -26,6 +26,38 @@ enum TaskStatus {
   SKIPPED
 }
 
+enum ContentType {
+  FIELD_NOTE
+  PROJECT_NOTE
+  SYSTEMS_MEMO
+  BLOG_FEATURE
+  CHANGE_LOG
+  DECISION_RECORD
+  SIGNAL_LOG
+}
+
+enum ContentStatus {
+  DRAFT
+  READY
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum ContentSource {
+  MANUAL
+  UPLOAD
+  GITHUB
+}
+
+enum CadenceTarget {
+  MONTHLY
+  BIMONTHLY
+  QUARTERLY
+  SIX_WEEKS
+  AD_HOC
+}
+
 enum EvidenceType {
   COMMIT
   PULL_REQUEST
@@ -121,6 +153,49 @@ model Task {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   project   Project    @relation(fields: [projectId], references: [id])
+}
+
+model ContentItem {
+  id           String        @id @default(cuid())
+  type         ContentType
+  status       ContentStatus
+  title        String?
+  summary      String?
+  body         String?
+  rawInput     String?
+  structured   Json?
+  aiMeta       Json?
+  source       ContentSource @default(MANUAL)
+  cadenceTarget CadenceTarget?
+  relatedSlugs String[]
+  topics       String[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  attachments  ContentAttachment[]
+  scheduleProposals ContentScheduleProposal[]
+}
+
+model ContentAttachment {
+  id            String      @id @default(cuid())
+  contentItemId String
+  fileName      String
+  mimeType      String
+  textContent   String
+  createdAt     DateTime    @default(now())
+  contentItem   ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+}
+
+model ContentScheduleProposal {
+  id            String         @id @default(cuid())
+  contentItemId String
+  status        ScheduleStatus
+  channel       String
+  scheduledFor  DateTime
+  rationale     String?
+  assumptions   String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  contentItem   ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {

@@ -1,0 +1,102 @@
+import { NextResponse } from "next/server";
+import { getPrismaClient } from "@/lib/prisma";
+import { assistContentItem } from "@/lib/content/assist";
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function POST(request: Request, { params }: Params) {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { ok: false, validation: { ok: false, errors: [{ code: "ai_missing", message: "AI assist not configured.", hint: "Set OPENAI_API_KEY to enable." }], warnings: [] } },
+        { status: 400 },
+      );
+    }
+
+    const resolved = await params;
+    const body = await request.json();
+    const mode = body?.mode as "sanitize" | "structure" | "summarize";
+    const apply = Boolean(body?.apply);
+
+    if (!mode) {
+      return NextResponse.json(
+        { ok: false, validation: { ok: false, errors: [{ code: "assist_mode_required", message: "mode is required." }], warnings: [] } },
+        { status: 400 },
+      );
+    }
+
+    const prisma = getPrismaClient();
+    const item = await prisma.contentItem.findUnique({ where: { id: resolved.id } });
+    if (!item) {
+      return NextResponse.json(
+        { ok: false, validation: { ok: false, errors: [{ code: "content_missing", message: "Content item not found." }], warnings: [] } },
+        { status: 404 },
+      );
+    }
+
+    if (apply) {
+      const suggested = body?.suggested as {
+        title?: string;
+        summary?: string;
+        body?: string;
+        structured?: unknown;
+      };
+      if (!suggested) {
+        return NextResponse.json(
+          { ok: false, validation: { ok: false, errors: [{ code: "assist_missing_payload", message: "suggested payload required for apply." }], warnings: [] } },
+          { status: 400 },
+        );
+      }
+      const updated = await prisma.contentItem.update({
+        where: { id: item.id },
+        data: {
+          title: suggested.title ?? item.title,
+          summary: suggested.summary ?? item.summary,
+          body: suggested.body ?? item.body,
+          structured: (suggested.structured as never) ?? item.structured,
+        },
+      });
+      await prisma.auditLog.create({
+        data: {
+          actor: "system:content_ops",
+          action: "content_assist_applied",
+          entityType: "ContentItem",
+          entityId: item.id,
+          note: `AI assist applied (${mode}).`,
+        },
+      });
+      return NextResponse.json({ ok: true, item: updated });
+    }
+
+    const suggested = await assistContentItem(item, mode);
+    await prisma.auditLog.create({
+      data: {
+        actor: "system:content_ops",
+        action: "content_assist_suggested",
+        entityType: "ContentItem",
+        entityId: item.id,
+        note: `AI assist suggested (${mode}).`,
+      },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      suggested,
+      preview: {
+        before: {
+          title: item.title,
+          summary: item.summary,
+          body: item.body,
+          structured: item.structured,
+        },
+        after: suggested,
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "AI assist failed.";
+    return NextResponse.json(
+      { ok: false, validation: { ok: false, errors: [{ code: "assist_failed", message }], warnings: [] } },
+      { status: 400 },
+    );
+  }
+}

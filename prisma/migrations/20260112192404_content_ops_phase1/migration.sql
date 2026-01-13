@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "ContentItem" ALTER COLUMN "relatedSlugs" DROP DEFAULT,
+ALTER COLUMN "topics" DROP DEFAULT,
+ALTER COLUMN "updatedAt" DROP DEFAULT;
