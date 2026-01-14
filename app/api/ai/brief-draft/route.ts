@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { generateBriefFromText } from "@/lib/ai/generateBriefFromText";
-import { getStylePreset } from "@/lib/content/stylePresets";
 import { ingestFiles, buildCombinedText } from "@/lib/content/ingest";
+import { requireApiContext } from "@/lib/auth/api";
+import { resolveInstructionContext } from "@/lib/ai/instructions";
 
 const getFiles = (formData: FormData) => {
   const files: File[] = [];
@@ -20,9 +21,11 @@ export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
   }
+  const auth = await requireApiContext("AI_BRIEFS");
+  if (!auth.ok) return auth.response;
 
   let promptText = "";
-  let stylePresetId = "";
+  let stylePresetId: string | undefined = undefined;
   let files: File[] = [];
 
   const contentType = request.headers.get("content-type") || "";
@@ -30,12 +33,12 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     promptText = typeof formData.get("promptText") === "string" ? String(formData.get("promptText")) : "";
     stylePresetId =
-      typeof formData.get("stylePresetId") === "string" ? String(formData.get("stylePresetId")) : "";
+      typeof formData.get("stylePresetId") === "string" ? String(formData.get("stylePresetId")) : undefined;
     files = getFiles(formData);
   } else {
     const body = await request.json();
     promptText = typeof body?.promptText === "string" ? body.promptText : "";
-    stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : "";
+    stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : undefined;
   }
 
   const { attachments, warnings } = await ingestFiles(files);
@@ -45,8 +48,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stylePreset = getStylePreset(stylePresetId);
-    const summary = await generateBriefFromText({ promptText: combinedText, stylePreset });
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: auth.context.workspaceId,
+      userId: auth.context.user.id,
+      stylePresetId,
+      context: ["General brief request"],
+    });
+    const summary = await generateBriefFromText({ promptText: combinedText, instructionContext });
     return NextResponse.json({ summary, warnings });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Brief draft failed.";

@@ -1,4 +1,5 @@
 import { getPrismaClient } from "@/lib/prisma";
+import { getAuditLabel } from "@/lib/audit/labels";
 import type {
   AuditLog as PrismaAuditLog,
   Brief as PrismaBrief,
@@ -88,12 +89,17 @@ const mapBrief = (brief: PrismaBrief) => ({
   createdAt: brief.createdAt.toISOString(),
 });
 
-const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
+const createAuditLog = async (
+  workspaceId: string,
+  entry: Omit<AuditLog, "id" | "createdAt">,
+) => {
   const prisma = getPrismaClient();
   await prisma.auditLog.create({
     data: {
+      workspaceId,
       actor: entry.actor,
       action: entry.action,
+      actionLabel: getAuditLabel(entry.action),
       entityType: entry.entityType,
       entityId: entry.entityId,
       note: entry.note,
@@ -102,14 +108,18 @@ const createAuditLog = async (entry: Omit<AuditLog, "id" | "createdAt">) => {
   });
 };
 
-export const createDbStore = (): StorageAdapter => ({
+export const createDbStore = (workspaceId: string): StorageAdapter => ({
   async getDashboard(): Promise<DashboardSummary> {
     const prisma = getPrismaClient();
     const [postsReady, schedulesReady, tasksDue, recentAudit] = await Promise.all([
-      prisma.post.count({ where: { status: "NEEDS_REVIEW" } }),
-      prisma.scheduleProposal.count({ where: { status: "NEEDS_REVIEW" } }),
-      prisma.task.count({ where: { status: "PENDING" } }),
-      prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 10 }),
+      prisma.post.count({ where: { status: "NEEDS_REVIEW", workspaceId } }),
+      prisma.scheduleProposal.count({ where: { status: "NEEDS_REVIEW", workspaceId } }),
+      prisma.task.count({ where: { status: "PENDING", workspaceId } }),
+      prisma.auditLog.findMany({
+        where: { workspaceId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
     ]);
 
     return {
@@ -125,9 +135,9 @@ export const createDbStore = (): StorageAdapter => ({
   async listInbox(): Promise<InboxSummary> {
     const prisma = getPrismaClient();
     const [posts, schedules] = await Promise.all([
-      prisma.post.findMany({ where: { status: "NEEDS_REVIEW" } }),
+      prisma.post.findMany({ where: { status: "NEEDS_REVIEW", workspaceId } }),
       prisma.scheduleProposal.findMany({
-        where: { status: "NEEDS_REVIEW" },
+        where: { status: "NEEDS_REVIEW", workspaceId },
         include: { items: true },
       }),
     ]);
@@ -140,7 +150,10 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listProjects() {
     const prisma = getPrismaClient();
-    const projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
+    const projects = await prisma.project.findMany({
+      where: { workspaceId },
+      orderBy: { name: "asc" },
+    });
     return projects.map((project) => ({
       id: project.id,
       name: project.name,
@@ -150,31 +163,37 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listBriefs() {
     const prisma = getPrismaClient();
-    const briefs = await prisma.brief.findMany({ orderBy: { createdAt: "desc" } });
+    const briefs = await prisma.brief.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+    });
     return briefs.map(mapBrief);
   },
 
   async getBrief(id: string) {
     const prisma = getPrismaClient();
-    const brief = await prisma.brief.findUnique({ where: { id } });
+    const brief = await prisma.brief.findFirst({ where: { id, workspaceId } });
     return brief ? mapBrief(brief) : null;
   },
 
   async listPosts() {
     const prisma = getPrismaClient();
-    const posts = await prisma.post.findMany({ orderBy: { updatedAt: "desc" } });
+    const posts = await prisma.post.findMany({
+      where: { workspaceId },
+      orderBy: { updatedAt: "desc" },
+    });
     return posts.map(mapPost);
   },
 
   async getPost(id: string) {
     const prisma = getPrismaClient();
-    const post = await prisma.post.findUnique({ where: { id } });
+    const post = await prisma.post.findFirst({ where: { id, workspaceId } });
     return post ? mapPost(post) : null;
   },
 
   async updatePostStatus(id: string, status: PostStatus, note?: string) {
     const prisma = getPrismaClient();
-    const existing = await prisma.post.findUnique({ where: { id } });
+    const existing = await prisma.post.findFirst({ where: { id, workspaceId } });
     if (!existing) return null;
 
     const post = await prisma.post.update({
@@ -182,7 +201,7 @@ export const createDbStore = (): StorageAdapter => ({
       data: { status },
     });
 
-    await createAuditLog({
+    await createAuditLog(workspaceId, {
       actor: "admin",
       action: `POST_${status}`,
       entityType: "Post",
@@ -199,12 +218,13 @@ export const createDbStore = (): StorageAdapter => ({
       where: { id },
       include: { items: true },
     });
-    return schedule ? mapSchedule(schedule) : null;
+    return schedule?.workspaceId === workspaceId ? mapSchedule(schedule) : null;
   },
 
   async listSchedules() {
     const prisma = getPrismaClient();
     const schedules = await prisma.scheduleProposal.findMany({
+      where: { workspaceId },
       include: { items: true },
       orderBy: { updatedAt: "desc" },
     });
@@ -213,7 +233,7 @@ export const createDbStore = (): StorageAdapter => ({
 
   async updateScheduleStatus(id: string, status: ScheduleStatus, note?: string) {
     const prisma = getPrismaClient();
-    const existing = await prisma.scheduleProposal.findUnique({ where: { id } });
+    const existing = await prisma.scheduleProposal.findFirst({ where: { id, workspaceId } });
     if (!existing) return null;
 
     const schedule = await prisma.scheduleProposal.update({
@@ -222,7 +242,7 @@ export const createDbStore = (): StorageAdapter => ({
       include: { items: true },
     });
 
-    await createAuditLog({
+    await createAuditLog(workspaceId, {
       actor: "admin",
       action: `SCHEDULE_${status}`,
       entityType: "ScheduleProposal",
@@ -235,13 +255,16 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listTasks() {
     const prisma = getPrismaClient();
-    const tasks = await prisma.task.findMany({ orderBy: { dueAt: "asc" } });
+    const tasks = await prisma.task.findMany({
+      where: { workspaceId },
+      orderBy: { dueAt: "asc" },
+    });
     return tasks.map(mapTask);
   },
 
   async updateTaskStatus(id: string, status: TaskStatus) {
     const prisma = getPrismaClient();
-    const existing = await prisma.task.findUnique({ where: { id } });
+    const existing = await prisma.task.findFirst({ where: { id, workspaceId } });
     if (!existing) return null;
 
     const task = await prisma.task.update({
@@ -249,7 +272,7 @@ export const createDbStore = (): StorageAdapter => ({
       data: { status },
     });
 
-    await createAuditLog({
+    await createAuditLog(workspaceId, {
       actor: "admin",
       action: `TASK_${status}`,
       entityType: "Task",
@@ -261,7 +284,10 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listRepos() {
     const prisma = getPrismaClient();
-    const repos = await prisma.repoAccess.findMany({ orderBy: { repo: "asc" } });
+    const repos = await prisma.repoAccess.findMany({
+      where: { workspaceId },
+      orderBy: { repo: "asc" },
+    });
     return repos.map(mapRepo);
   },
 
@@ -269,9 +295,10 @@ export const createDbStore = (): StorageAdapter => ({
     const prisma = getPrismaClient();
     // TODO: Replace full reset with targeted upserts once repo lifecycle is defined.
     await prisma.$transaction([
-      prisma.repoAccess.deleteMany(),
+      prisma.repoAccess.deleteMany({ where: { workspaceId } }),
       prisma.repoAccess.createMany({ data: repos.map((repo) => ({
         id: repo.id,
+        workspaceId,
         repo: repo.repo,
         projectTag: repo.projectTag,
         enabled: repo.enabled,
@@ -281,7 +308,7 @@ export const createDbStore = (): StorageAdapter => ({
       })) }),
     ]);
 
-    await createAuditLog({
+    await createAuditLog(workspaceId, {
       actor: "admin",
       action: "SETTINGS_REPOS_UPDATED",
       entityType: "RepoAccess",
@@ -294,7 +321,11 @@ export const createDbStore = (): StorageAdapter => ({
 
   async listAuditLogs(limit: number) {
     const prisma = getPrismaClient();
-    const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: limit });
+    const logs = await prisma.auditLog.findMany({
+      where: { workspaceId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
     return logs.map(mapAudit);
   },
 });

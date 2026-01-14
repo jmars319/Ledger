@@ -1,7 +1,7 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
 import type { StylePreset } from "@/lib/content/stylePresets";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 type EvidenceItem = {
   type: string;
@@ -33,6 +33,7 @@ export async function generateBrief(input: {
     doList?: string;
     dontList?: string;
   };
+  instructionContext?: InstructionContext;
 }): Promise<string> {
   if (!input.items.length) {
     throw new Error("No evidence items provided.");
@@ -53,11 +54,13 @@ export async function generateBrief(input: {
     })
     .join("\n\n---\n\n");
 
-  const instructionBlock = buildInstructionBlock({
-    style: input.stylePreset,
-    org: input.brandInstructions,
-    context: [`Repo: ${input.repoFullName}`],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      style: input.stylePreset,
+      org: input.brandInstructions,
+      context: [`Repo: ${input.repoFullName}`],
+    },
+  );
 
   const coverage = input.coverage;
   const coverageLine = coverage

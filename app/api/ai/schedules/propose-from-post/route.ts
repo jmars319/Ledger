@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generateScheduleProposal } from "@/lib/ai/generateScheduleProposal";
+import { requireApiContext } from "@/lib/auth/api";
+import { resolveInstructionContext } from "@/lib/ai/instructions";
 
 const fallbackDate = () => {
   const date = new Date();
@@ -16,6 +18,8 @@ export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
   }
+  const auth = await requireApiContext("AI_SCHEDULER");
+  if (!auth.ok) return auth.response;
 
   const body = await request.json();
   const postId = typeof body?.postId === "string" ? body.postId : "";
@@ -25,7 +29,9 @@ export async function POST(request: Request) {
 
   try {
     const prisma = getPrismaClient();
-    const post = await prisma.post.findUnique({ where: { id: postId } });
+    const post = await prisma.post.findFirst({
+      where: { id: postId, workspaceId: auth.context.workspaceId },
+    });
     if (!post) {
       return NextResponse.json({ error: "Post not found." }, { status: 404 });
     }
@@ -41,9 +47,15 @@ export async function POST(request: Request) {
           ? postJson.body
           : "";
 
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: auth.context.workspaceId,
+      userId: auth.context.user.id,
+      context: [`Platform: ${post.platform}`],
+    });
     const suggestion = await generateScheduleProposal({
       postText: postText || post.title,
       platform: post.platform,
+      instructionContext,
     });
 
     const scheduledFor = new Date(suggestion.scheduledFor);
@@ -52,6 +64,7 @@ export async function POST(request: Request) {
 
     const schedule = await prisma.scheduleProposal.create({
       data: {
+        workspaceId: auth.context.workspaceId,
         projectId: post.projectId,
         status: "NEEDS_REVIEW",
         items: {
@@ -71,6 +84,7 @@ export async function POST(request: Request) {
         action: "SCHEDULE_PROPOSED",
         entityType: "ScheduleProposal",
         entityId: schedule.id,
+        workspaceId: auth.context.workspaceId,
         metadata: {
           postId: post.id,
           channel,

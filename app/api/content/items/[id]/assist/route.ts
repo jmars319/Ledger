@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { assistContentItem } from "@/lib/content/assist";
+import { requireApiContext } from "@/lib/auth/api";
+import { resolveInstructionContext } from "@/lib/ai/instructions";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -12,6 +14,9 @@ export async function POST(request: Request, { params }: Params) {
         { status: 400 },
       );
     }
+
+    const auth = await requireApiContext("AI_CONTENT_ASSIST");
+    if (!auth.ok) return auth.response;
 
     const resolved = await params;
     const body = await request.json();
@@ -26,7 +31,9 @@ export async function POST(request: Request, { params }: Params) {
     }
 
     const prisma = getPrismaClient();
-    const item = await prisma.contentItem.findUnique({ where: { id: resolved.id } });
+    const item = await prisma.contentItem.findFirst({
+      where: { id: resolved.id, workspaceId: auth.context.workspaceId },
+    });
     if (!item) {
       return NextResponse.json(
         { ok: false, validation: { ok: false, errors: [{ code: "content_missing", message: "Content item not found." }], warnings: [] } },
@@ -58,7 +65,9 @@ export async function POST(request: Request, { params }: Params) {
       });
       await prisma.auditLog.create({
         data: {
+          workspaceId: auth.context.workspaceId,
           actor: "system:content_ops",
+          actorUserId: auth.context.user.id,
           action: "content_assist_applied",
           entityType: "ContentItem",
           entityId: item.id,
@@ -68,10 +77,17 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ ok: true, item: updated });
     }
 
-    const suggested = await assistContentItem(item, mode);
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: auth.context.workspaceId,
+      userId: auth.context.user.id,
+      context: [`Mode: ${mode}`, `Content type: ${item.type}`],
+    });
+    const suggested = await assistContentItem(item, mode, instructionContext);
     await prisma.auditLog.create({
       data: {
+        workspaceId: auth.context.workspaceId,
         actor: "system:content_ops",
+        actorUserId: auth.context.user.id,
         action: "content_assist_suggested",
         entityType: "ContentItem",
         entityId: item.id,

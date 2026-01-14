@@ -1,21 +1,24 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
 import type { StylePreset } from "@/lib/content/stylePresets";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 export async function generateBriefFromText(input: {
   promptText: string;
   stylePreset?: StylePreset;
+  instructionContext?: InstructionContext;
 }): Promise<string> {
   const promptText = input.promptText.trim();
   if (!promptText) {
     throw new Error("promptText is required.");
   }
 
-  const instructionBlock = buildInstructionBlock({
-    style: input.stylePreset,
-    context: ["General brief request"],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      style: input.stylePreset,
+      context: ["General brief request"],
+    },
+  );
 
   const prompt =
     "You are a project assistant. Produce a concise, general brief for human review.\n" +

@@ -2,7 +2,7 @@ import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
 import type { ContentType } from "@/lib/content/types";
 import type { StylePreset } from "@/lib/content/stylePresets";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 export type GeneratedContentDraft = {
   title: string | null;
@@ -31,16 +31,19 @@ export const generateContentDraft = async (input: {
   type: ContentType;
   stylePreset: StylePreset;
   sourceText: string;
+  instructionContext?: InstructionContext;
 }) => {
   const sourceText = input.sourceText.trim();
   if (!sourceText) {
     throw new Error("Source text is required.");
   }
 
-  const instructionBlock = buildInstructionBlock({
-    style: input.stylePreset,
-    context: [`Content type: ${input.type}`],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      style: input.stylePreset,
+      context: [`Content type: ${input.type}`],
+    },
+  );
 
   const prompt =
     "You are generating a draft content item for a human review workflow.\n" +

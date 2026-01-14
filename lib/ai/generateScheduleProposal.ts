@@ -1,6 +1,6 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 export type ScheduleSuggestion = {
   scheduledFor: string;
@@ -12,15 +12,18 @@ export type ScheduleSuggestion = {
 export const generateScheduleProposal = async (input: {
   postText: string;
   platform: string;
+  instructionContext?: InstructionContext;
 }): Promise<ScheduleSuggestion> => {
   const postText = input.postText.trim();
   if (!postText) {
     throw new Error("postText is required.");
   }
 
-  const instructionBlock = buildInstructionBlock({
-    context: [`Platform: ${input.platform}`],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      context: [`Platform: ${input.platform}`],
+    },
+  );
 
   const prompt =
     "You are a scheduling assistant for a human review workflow.\n" +

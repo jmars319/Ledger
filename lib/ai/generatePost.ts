@@ -1,7 +1,7 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
 import type { StylePreset } from "@/lib/content/stylePresets";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 type PostInput = {
   briefText: string;
@@ -35,6 +35,7 @@ type PostInput = {
     dontList?: string;
   };
   stylePreset?: StylePreset;
+  instructionContext?: InstructionContext;
 };
 
 const platformInstructions: Record<NonNullable<PostInput["platform"]>, string> = {
@@ -81,11 +82,13 @@ export async function generatePost(input: PostInput): Promise<string> {
         })
         .join("\n\n---\n\n")
     : "No evidence items provided.";
-  const instructionBlock = buildInstructionBlock({
-    style: input.stylePreset,
-    org: input.brandInstructions,
-    context: [`Platform: ${platform}`],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      style: input.stylePreset,
+      org: input.brandInstructions,
+      context: [`Platform: ${platform}`],
+    },
+  );
   const prompt =
     "You are drafting a social media post for a human review workflow.\n" +
     "The output must be plain text only. No markdown, no JSON, no hashtags unless explicitly asked.\n" +

@@ -1,6 +1,6 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
 export type TaskSuggestion = {
   title: string;
@@ -11,15 +11,18 @@ export type TaskSuggestion = {
 export const generateTaskSuggestion = async (input: {
   promptText: string;
   projectName?: string;
+  instructionContext?: InstructionContext;
 }): Promise<TaskSuggestion> => {
   const promptText = input.promptText.trim();
   if (!promptText) {
     throw new Error("promptText is required.");
   }
 
-  const instructionBlock = buildInstructionBlock({
-    context: ["Manual task suggestion"],
-  });
+  const instructionBlock = buildInstructionBlock(
+    input.instructionContext ?? {
+      context: ["Manual task suggestion"],
+    },
+  );
 
   const prompt =
     "You are drafting a manual task for a human review workflow.\n" +

@@ -8,6 +8,10 @@ export type InstructionContext = {
     doList?: string;
     dontList?: string;
   };
+  user?: {
+    tone?: string;
+    notes?: string;
+  };
   style?: {
     id?: string;
     name?: string;
@@ -60,6 +64,13 @@ export const buildInstructionBlock = (input: InstructionContext) => {
       ].filter(Boolean)
     : [];
   const contextBlock = input.context?.length ? ["Context:", ...input.context] : [];
+  const userBlock = input.user
+    ? [
+        "User preferences:",
+        input.user.tone ? `- Tone: ${input.user.tone}` : null,
+        input.user.notes ? `- Notes: ${input.user.notes}` : null,
+      ].filter(Boolean)
+    : [];
 
   const block = [
     "Global hard rules:",
@@ -67,6 +78,8 @@ export const buildInstructionBlock = (input: InstructionContext) => {
     "",
     ...orgBlock,
     orgBlock.length ? "" : null,
+    ...userBlock,
+    userBlock.length ? "" : null,
     ...styleBlock,
     styleBlock.length ? "" : null,
     ...contextBlock,

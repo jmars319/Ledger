@@ -4,6 +4,8 @@ import { contentTypes } from "@/lib/content/types";
 import { getStylePreset } from "@/lib/content/stylePresets";
 import { ingestFiles, buildCombinedText } from "@/lib/content/ingest";
 import { generateContentDraft, CONTENT_DRAFT_PROMPT_VERSION } from "@/lib/ai/generateContentDraft";
+import { requireApiContext } from "@/lib/auth/api";
+import { resolveInstructionContext } from "@/lib/ai/instructions";
 
 const getFiles = (formData: FormData) => {
   const files: File[] = [];
@@ -22,9 +24,11 @@ export async function POST(request: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
   }
+  const auth = await requireApiContext("AI_ASSIST");
+  if (!auth.ok) return auth.response;
 
   let type = "";
-  let stylePresetId = "";
+  let stylePresetId: string | undefined = undefined;
   let rawText = "";
   let format: "json" | "md" = "md";
   let files: File[] = [];
@@ -34,14 +38,16 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     type = typeof formData.get("type") === "string" ? (formData.get("type") as string) : "";
     stylePresetId =
-      typeof formData.get("stylePresetId") === "string" ? (formData.get("stylePresetId") as string) : "";
+      typeof formData.get("stylePresetId") === "string"
+        ? (formData.get("stylePresetId") as string)
+        : undefined;
     rawText = typeof formData.get("rawText") === "string" ? (formData.get("rawText") as string) : "";
     format = formData.get("format") === "json" ? "json" : "md";
     files = getFiles(formData);
   } else {
     const body = await request.json();
     type = typeof body?.type === "string" ? body.type : "";
-    stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : "";
+    stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : undefined;
     rawText = typeof body?.rawText === "string" ? body.rawText : "";
     format = body?.format === "json" ? "json" : "md";
   }
@@ -58,10 +64,17 @@ export async function POST(request: Request) {
 
   try {
     const stylePreset = getStylePreset(stylePresetId);
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: auth.context.workspaceId,
+      userId: auth.context.user.id,
+      stylePresetId,
+      context: [`Content type: ${type}`],
+    });
     const draft = await generateContentDraft({
       type: type as never,
       stylePreset,
       sourceText: combinedText,
+      instructionContext,
     });
 
     const aiMeta = {
@@ -73,7 +86,7 @@ export async function POST(request: Request) {
       format,
     };
 
-    const created = await createContentItem({
+    const created = await createContentItem(auth.context.workspaceId, {
       type: type as never,
       status: "DRAFT",
       title: draft.title ?? null,
@@ -84,14 +97,14 @@ export async function POST(request: Request) {
       source: files.length ? "UPLOAD" : "MANUAL",
       aiMeta,
       format,
-    });
+    }, auth.context.user.id);
 
     if (!created.ok || !created.item) {
       return NextResponse.json({ ok: false, validation: created.validation }, { status: 400 });
     }
 
     for (const attachment of attachments) {
-      await attachContent(created.item.id, {
+      await attachContent(auth.context.workspaceId, created.item.id, {
         fileName: attachment.fileName || "upload",
         mimeType: attachment.mimeType || "application/octet-stream",
         textContent: attachment.textContent,

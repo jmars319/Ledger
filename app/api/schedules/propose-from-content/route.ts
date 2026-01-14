@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getContentItem, createContentScheduleProposal } from "@/lib/content/service";
 import type { ContentType } from "@/lib/content/types";
+import { requireApiContext } from "@/lib/auth/api";
 
 const channelByType: Record<ContentType, string> = {
   FIELD_NOTE: "Website",
@@ -21,13 +22,15 @@ const suggestDate = () => {
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireApiContext("AI_SCHEDULER");
+    if (!auth.ok) return auth.response;
     const body = await request.json();
     const contentItemId = typeof body?.contentItemId === "string" ? body.contentItemId : "";
     if (!contentItemId) {
       return NextResponse.json({ error: "contentItemId is required." }, { status: 400 });
     }
 
-    const item = await getContentItem(contentItemId);
+    const item = await getContentItem(auth.context.workspaceId, contentItemId);
     if (!item) {
       return NextResponse.json({ error: "Content item not found." }, { status: 404 });
     }
@@ -38,6 +41,7 @@ export async function POST(request: Request) {
     const assumptions = `Channel assumes standard placement for ${item.type}.`;
 
     const result = await createContentScheduleProposal({
+      workspaceId: auth.context.workspaceId,
       contentItemId,
       channel,
       scheduledFor,

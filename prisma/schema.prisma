@@ -26,6 +26,31 @@ enum TaskStatus {
   SKIPPED
 }
 
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+enum FeatureKey {
+  GITHUB
+  GITHUB_CONNECT
+  GITHUB_SYNC
+  CONTENT_OPS
+  CONTENT_UPLOAD
+  SCHEDULING
+  AI_ASSIST
+  AI_BRIEFS
+  AI_CONTENT_ASSIST
+  AI_SCHEDULER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum ContentType {
   FIELD_NOTE
   PROJECT_NOTE
@@ -73,17 +98,21 @@ enum EvidenceScope {
 
 model Project {
   id        String             @id @default(cuid())
+  workspaceId String
   name      String
-  tag       String             @unique
+  tag       String
   briefs    Brief[]
   posts     Post[]
   schedules ScheduleProposal[]
   tasks     Task[]
   repos     RepoAccess[]
+  workspace Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, tag])
 }
 
 model RepoAccess {
   id               String   @id @default(cuid())
+  workspaceId      String
   repo             String
   projectTag       String
   enabled          Boolean  @default(true)
@@ -93,17 +122,21 @@ model RepoAccess {
   projectId        String?
   project          Project? @relation(fields: [projectId], references: [id])
   briefs           Brief[]
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  @@unique([workspaceId, repo])
 }
 
 model Brief {
   id        String   @id @default(cuid())
+  workspaceId String
   projectId String
   evidenceBundleId String?
   sourceRepoId String?
   summary   String
   createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project  @relation(fields: [projectId], references: [id])
   evidenceBundle EvidenceBundle? @relation(fields: [evidenceBundleId], references: [id])
   sourceRepo RepoAccess? @relation(fields: [sourceRepoId], references: [id])
@@ -111,6 +144,7 @@ model Brief {
 
 model Post {
   id        String      @id @default(cuid())
+  workspaceId String
   projectId String
   platform  String
   title     String
@@ -119,17 +153,20 @@ model Post {
   claims    String[]
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
+  workspace Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project     @relation(fields: [projectId], references: [id])
   scheduleItems ScheduleItem[]
 }
 
 model ScheduleProposal {
   id        String         @id @default(cuid())
+  workspaceId String
   projectId String
   status    ScheduleStatus
   items     ScheduleItem[]
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project        @relation(fields: [projectId], references: [id])
 }
 
@@ -145,6 +182,7 @@ model ScheduleItem {
 
 model Task {
   id        String     @id @default(cuid())
+  workspaceId String
   projectId String
   title     String
   status    TaskStatus
@@ -152,11 +190,13 @@ model Task {
   copyText  String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project   Project    @relation(fields: [projectId], references: [id])
 }
 
 model ContentItem {
   id           String        @id @default(cuid())
+  workspaceId  String
   type         ContentType
   status       ContentStatus
   title        String?
@@ -173,6 +213,7 @@ model ContentItem {
   updatedAt    DateTime      @updatedAt
   attachments  ContentAttachment[]
   scheduleProposals ContentScheduleProposal[]
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model ContentAttachment {
@@ -187,6 +228,7 @@ model ContentAttachment {
 
 model ContentScheduleProposal {
   id            String         @id @default(cuid())
+  workspaceId   String
   contentItemId String
   status        ScheduleStatus
   channel       String
@@ -195,22 +237,31 @@ model ContentScheduleProposal {
   assumptions   String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   contentItem   ContentItem    @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
 }
 
 model AuditLog {
   id         String   @id @default(cuid())
+  workspaceId String
   createdAt  DateTime @default(now())
   actor      String
+  actorUserId String?
   action     String
+  actionLabel String?
   entityType String
   entityId   String
   note       String?
   metadata   Json?
+  beforeJson Json?
+  afterJson  Json?
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorUser  User?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
 }
 
 model EvidenceBundle {
   id           String         @id @default(cuid())
+  workspaceId  String
   repoId       String
   repoFullName String
   scope        EvidenceScope
@@ -220,10 +271,12 @@ model EvidenceBundle {
   createdAt    DateTime       @default(now())
   items        EvidenceItem[]
   briefs       Brief[]
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model EvidenceItem {
   id         String       @id @default(cuid())
+  workspaceId String
   bundleId   String
   type       EvidenceType
   title      String
@@ -233,21 +286,26 @@ model EvidenceItem {
   content    String?
   metadata   Json?
   bundle     EvidenceBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  workspace  Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 }
 
 model GitHubInstallation {
   id             String       @id @default(cuid())
-  installationId Int          @unique
+  workspaceId    String
+  installationId Int
   accountLogin   String
   accountType    String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   repos          GitHubRepo[]
+  workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, installationId])
 }
 
 model GitHubRepo {
   id              String             @id @default(cuid())
-  repoId          Int                @unique
+  workspaceId     String
+  repoId          Int
   fullName        String
   name            String
   private         Boolean
@@ -258,4 +316,206 @@ model GitHubRepo {
   updatedAt       DateTime           @updatedAt
   installationId  String
   installation    GitHubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
+  workspace       Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, repoId])
+}
+
+model User {
+  id              String           @id @default(cuid())
+  email           String           @unique
+  passwordHash    String
+  isAdmin         Boolean          @default(false)
+  failedLoginCount Int?            @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  memberships     WorkspaceMember[]
+  sessions        Session[]
+  passwordResets  PasswordReset[]
+  userInstructions UserInstruction?
+  stylePreferences UserStylePreference[]
+  auditLogs       AuditLog[]
+  usageLogs       WorkspaceUsageLog[]
+  createdStyles   WorkspaceStyle[]
+}
+
+model Workspace {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  members       WorkspaceMember[]
+  features      WorkspaceFeature[]
+  invites       WorkspaceInvite[]
+  instructions  WorkspaceInstruction?
+  apiKeys       WorkspaceApiKey?
+  usageCaps     WorkspaceUsageCaps?
+  usageLogs     WorkspaceUsageLog[]
+  styles        WorkspaceStyle[]
+  stylePreferences UserStylePreference[]
+  projects      Project[]
+  repos         RepoAccess[]
+  briefs        Brief[]
+  posts         Post[]
+  schedules     ScheduleProposal[]
+  tasks         Task[]
+  content       ContentItem[]
+  auditLogs     AuditLog[]
+  evidenceBundles EvidenceBundle[]
+  evidenceItems EvidenceItem[]
+  githubInstallations GitHubInstallation[]
+  githubRepos   GitHubRepo[]
+  contentSchedules ContentScheduleProposal[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordReset {
+  id          String   @id @default(cuid())
+  userId      String
+  token       String   @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceInvite {
+  id          String        @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole @default(MEMBER)
+  token       String        @unique
+  status      InviteStatus  @default(PENDING)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceFeature {
+  id          String     @id @default(cuid())
+  workspaceId String
+  key         FeatureKey
+  enabled     Boolean    @default(true)
+  updatedAt   DateTime   @updatedAt
+
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, key])
+}
+
+model WorkspaceInstruction {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  tone        String?
+  voice       String?
+  hardRules   String?
+  doList      String?
+  dontList    String?
+  updatedAt   DateTime @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model UserInstruction {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tone      String?
+  notes     String?
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceApiKey {
+  id            String   @id @default(cuid())
+  workspaceId   String   @unique
+  provider      String   @default("openai")
+  apiKeyCipher  String?
+  apiKeyLast4   String?
+  updatedAt     DateTime @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceUsageCaps {
+  id            String   @id @default(cuid())
+  workspaceId   String   @unique
+  dailyLimit    Int?
+  monthlyLimit  Int?
+  updatedAt     DateTime @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model WorkspaceUsageLog {
+  id            String   @id @default(cuid())
+  workspaceId   String
+  userId        String?
+  model         String?
+  tokens        Int?
+  requestCount  Int?     @default(1)
+  createdAt     DateTime @default(now())
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model WorkspaceStyle {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  name            String
+  description     String?
+  instructions    Json
+  isPreset        Boolean  @default(false)
+  createdByUserId String?
+  updatedAt       DateTime @updatedAt
+
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy       User?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, name])
+}
+
+model UserStylePreference {
+  id              String   @id @default(cuid())
+  userId          String
+  workspaceId     String
+  defaultStyleId  String?
+  updatedAt       DateTime @updatedAt
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
 }

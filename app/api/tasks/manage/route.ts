@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
+import { requireApiContext } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Tasks require STORAGE_MODE=db." }, { status: 400 });
   }
+  const auth = await requireApiContext("SCHEDULING");
+  if (!auth.ok) return auth.response;
 
   const body = await request.json();
   if (!body?.projectId || typeof body.projectId !== "string") {
@@ -23,13 +26,16 @@ export async function POST(request: Request) {
   }
 
   const prisma = getPrismaClient();
-  const project = await prisma.project.findUnique({ where: { id: body.projectId } });
+  const project = await prisma.project.findFirst({
+    where: { id: body.projectId, workspaceId: auth.context.workspaceId },
+  });
   if (!project) {
     return NextResponse.json({ error: "Project not found." }, { status: 404 });
   }
 
   const task = await prisma.task.create({
     data: {
+      workspaceId: auth.context.workspaceId,
       projectId: body.projectId,
       title: body.title.trim(),
       status: "PENDING",
@@ -44,6 +50,7 @@ export async function POST(request: Request) {
       action: "TASK_CREATED",
       entityType: "Task",
       entityId: task.id,
+      workspaceId: auth.context.workspaceId,
       metadata: { projectId: body.projectId },
     },
   });

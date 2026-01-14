@@ -223,7 +223,9 @@ const addAuditLog = (entry: Omit<AuditLog, "id" | "createdAt">) => {
   });
 };
 
-export const createMemoryStore = (): StorageAdapter => ({
+export const createMemoryStore = (_workspaceId: string): StorageAdapter => {
+  void _workspaceId;
+  return {
   async getDashboard(): Promise<DashboardSummary> {
     return {
       counts: {
@@ -336,4 +338,5 @@ export const createMemoryStore = (): StorageAdapter => ({
   async listAuditLogs(limit: number) {
     return data.auditLogs.slice(0, limit);
   },
-});
+  };
+};

@@ -1,14 +1,20 @@
 import "server-only";
 import { getOpenAI } from "@/lib/ai/client";
-import { buildInstructionBlock } from "@/lib/ai/instructions";
+import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 import type { ContentItem } from "@prisma/client";
 
 type AssistMode = "sanitize" | "structure" | "summarize";
 
-export const assistContentItem = async (item: ContentItem, mode: AssistMode) => {
-  const instructionBlock = buildInstructionBlock({
-    context: [`Mode: ${mode}`, `Content type: ${item.type}`],
-  });
+export const assistContentItem = async (
+  item: ContentItem,
+  mode: AssistMode,
+  instructionContext?: InstructionContext,
+) => {
+  const instructionBlock = buildInstructionBlock(
+    instructionContext ?? {
+      context: [`Mode: ${mode}`, `Content type: ${item.type}`],
+    },
+  );
   const prompt = [
     "You are a content ops assistant. Clean up or structure the content without changing meaning.",
     instructionBlock.block,

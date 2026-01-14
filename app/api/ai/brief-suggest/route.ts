@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generateBrief } from "@/lib/ai/generateBrief";
-import { getStylePreset } from "@/lib/content/stylePresets";
+import { requireApiContext } from "@/lib/auth/api";
+import { resolveInstructionContext } from "@/lib/ai/instructions";
 
 export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Brief suggestion requires STORAGE_MODE=db." }, { status: 400 });
   }
+  const auth = await requireApiContext("AI_BRIEFS");
+  if (!auth.ok) return auth.response;
 
   const body = await request.json();
   const bundleId = typeof body?.bundleId === "string" ? body.bundleId : "";
-  const stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : "";
+  const stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : undefined;
   const instructions =
     body.instructions && typeof body.instructions === "object"
       ? {
@@ -42,9 +45,21 @@ export async function POST(request: Request) {
   if (!bundle) {
     return NextResponse.json({ error: "Evidence bundle not found." }, { status: 404 });
   }
+  if (bundle.workspaceId !== auth.context.workspaceId) {
+    return NextResponse.json({ error: "Evidence bundle not found." }, { status: 404 });
+  }
 
   const fullCoverage = await prisma.evidenceBundle.findFirst({
-    where: { repoId: bundle.repoId, scope: "FULL" },
+    where: { repoId: bundle.repoId, scope: "FULL", workspaceId: auth.context.workspaceId },
+  });
+
+  const instructionContext = await resolveInstructionContext({
+    workspaceId: auth.context.workspaceId,
+    userId: auth.context.user.id,
+    stylePresetId,
+    orgTag: instructions?.tag,
+    orgOverride: instructions,
+    context: [`Repo: ${bundle.repoFullName}`],
   });
 
   const text = await generateBrief({
@@ -64,8 +79,7 @@ export async function POST(request: Request) {
       autoSelected: bundle.autoSelected,
       fullCoverageComplete: Boolean(fullCoverage),
     },
-    stylePreset: getStylePreset(stylePresetId),
-    brandInstructions: instructions,
+    instructionContext,
   });
 
   return NextResponse.json({ summary: text });
