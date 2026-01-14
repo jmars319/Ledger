@@ -54,6 +54,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 try {
   const installation = await prisma.gitHubInstallation.findFirst({
+    where: { workspaceId: "workspace_default" },
     orderBy: { createdAt: "desc" },
   });
 
