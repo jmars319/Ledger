@@ -69,6 +69,7 @@ export default async function WorkspacesPage() {
         <WorkspacesClient
           workspaces={workspaces}
           canInvite={canInvite}
+          canCreate={session.user.isAdmin}
           activeWorkspaceId={activeWorkspaceId}
         />
       </section>

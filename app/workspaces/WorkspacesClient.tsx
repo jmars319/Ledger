@@ -20,13 +20,17 @@ type Props = {
   workspaces: WorkspaceRow[];
   activeWorkspaceId: string;
   canInvite: boolean;
+  canCreate: boolean;
 };
 
-export default function WorkspacesClient({ workspaces, activeWorkspaceId, canInvite }: Props) {
+export default function WorkspacesClient({ workspaces, activeWorkspaceId, canInvite, canCreate }: Props) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"OWNER" | "MEMBER">("MEMBER");
   const [inviteStatus, setInviteStatus] = useState<InviteResponse | null>(null);
   const [switching, setSwitching] = useState<string | null>(null);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceSlug, setWorkspaceSlug] = useState("");
+  const [createStatus, setCreateStatus] = useState<InviteResponse | null>(null);
 
   const handleSwitch = async (workspaceId: string) => {
     setSwitching(workspaceId);
@@ -67,6 +71,31 @@ export default function WorkspacesClient({ workspaces, activeWorkspaceId, canInv
     }
     setInviteStatus({ ok: true, inviteUrl: data?.inviteUrl });
     setInviteEmail("");
+  };
+
+  const submitWorkspace = async () => {
+    setCreateStatus(null);
+    const name = workspaceName.trim();
+    if (!name) {
+      setCreateStatus({ ok: false, error: "Workspace name is required." });
+      return;
+    }
+    const res = await fetch("/api/workspaces/create", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        slug: workspaceSlug.trim(),
+      }),
+    });
+    const data = (await res.json().catch(() => null)) as InviteResponse;
+    if (!res.ok) {
+      setCreateStatus({ ok: false, error: data?.error ?? "Workspace creation failed." });
+      return;
+    }
+    setWorkspaceName("");
+    setWorkspaceSlug("");
+    window.location.href = "/workspaces";
   };
 
   return (
@@ -139,6 +168,39 @@ export default function WorkspacesClient({ workspaces, activeWorkspaceId, canInv
                 {inviteStatus.inviteUrl}
               </a>
             </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {canCreate ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+          <div className="mb-1 text-sm font-semibold text-slate-200">Create workspace</div>
+          <div className="mb-3 text-xs text-slate-400">Admins only. Slug auto-generates if blank.</div>
+          <div className="grid gap-3 sm:grid-cols-[2fr_1fr_auto]">
+            <input
+              type="text"
+              placeholder="Workspace name"
+              value={workspaceName}
+              onChange={(event) => setWorkspaceName(event.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100"
+            />
+            <input
+              type="text"
+              placeholder="optional-slug"
+              value={workspaceSlug}
+              onChange={(event) => setWorkspaceSlug(event.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100"
+            />
+            <button
+              type="button"
+              onClick={submitWorkspace}
+              className="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+            >
+              Create
+            </button>
+          </div>
+          {createStatus?.error ? (
+            <div className="mt-3 text-xs text-rose-300">{createStatus.error}</div>
           ) : null}
         </div>
       ) : null}
