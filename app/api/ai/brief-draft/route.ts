@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { generateBriefFromText } from "@/lib/ai/generateBriefFromText";
 import { ingestFiles, buildCombinedText } from "@/lib/content/ingest";
 import { requireApiContext } from "@/lib/auth/api";
-import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { resolveInstructionContext, resolveStylePresetId } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
+import { getPrismaClient } from "@/lib/prisma";
 
 const getFiles = (formData: FormData) => {
   const files: File[] = [];
@@ -18,11 +20,17 @@ export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Brief draft requires STORAGE_MODE=db." }, { status: 400 });
   }
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
-  }
   const auth = await requireApiContext("AI_BRIEFS");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   let promptText = "";
   let stylePresetId: string | undefined = undefined;
@@ -48,13 +56,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const instructionContext = await resolveInstructionContext({
-      workspaceId: auth.context.workspaceId,
-      userId: auth.context.user.id,
+    const resolvedStylePresetId = await resolveStylePresetId({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
       stylePresetId,
+    });
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
+      stylePresetId: resolvedStylePresetId,
       context: ["General brief request"],
     });
-    const summary = await generateBriefFromText({ promptText: combinedText, instructionContext });
+    const openai = await getOpenAIForWorkspace(context.workspaceId);
+    const summary = await generateBriefFromText({ promptText: combinedText, instructionContext, openai });
     return NextResponse.json({ summary, warnings });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Brief draft failed.";

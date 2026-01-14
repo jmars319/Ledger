@@ -3,6 +3,8 @@ import { getPrismaClient } from "@/lib/prisma";
 import { assistContentItem } from "@/lib/content/assist";
 import { requireApiContext } from "@/lib/auth/api";
 import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
+import { getAuditLabel } from "@/lib/audit/labels";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -69,6 +71,7 @@ export async function POST(request: Request, { params }: Params) {
           actor: "system:content_ops",
           actorUserId: auth.context.user.id,
           action: "content_assist_applied",
+          actionLabel: getAuditLabel("content_assist_applied"),
           entityType: "ContentItem",
           entityId: item.id,
           note: `AI assist applied (${mode}).`,
@@ -82,13 +85,15 @@ export async function POST(request: Request, { params }: Params) {
       userId: auth.context.user.id,
       context: [`Mode: ${mode}`, `Content type: ${item.type}`],
     });
-    const suggested = await assistContentItem(item, mode, instructionContext);
+    const openai = await getOpenAIForWorkspace(auth.context.workspaceId);
+    const suggested = await assistContentItem(item, mode, instructionContext, openai);
     await prisma.auditLog.create({
       data: {
         workspaceId: auth.context.workspaceId,
         actor: "system:content_ops",
         actorUserId: auth.context.user.id,
         action: "content_assist_suggested",
+        actionLabel: getAuditLabel("content_assist_suggested"),
         entityType: "ContentItem",
         entityId: item.id,
         note: `AI assist suggested (${mode}).`,

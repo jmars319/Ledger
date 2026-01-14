@@ -3,7 +3,9 @@ import { getPrismaClient } from "@/lib/prisma";
 import { generatePost } from "@/lib/ai/generatePost";
 import { getStylePreset } from "@/lib/content/stylePresets";
 import { requireApiContext } from "@/lib/auth/api";
-import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { resolveInstructionContext, resolveStylePresetId } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
+import { getAuditLabel } from "@/lib/audit/labels";
 
 type Platform =
   | "twitter"
@@ -66,6 +68,15 @@ export async function POST(request: Request) {
   }
   const auth = await requireApiContext("AI_ASSIST");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   const body = await request.json();
   if (!body?.briefId || typeof body.briefId !== "string") {
@@ -78,23 +89,10 @@ export async function POST(request: Request) {
     : [];
   const stylePresetId = typeof body.stylePresetId === "string" ? body.stylePresetId : undefined;
   const brandTag = typeof body.brandTag === "string" ? body.brandTag : undefined;
-  const instructions =
-    body.instructions && typeof body.instructions === "object"
-      ? {
-          tag: typeof body.instructions.tag === "string" ? body.instructions.tag : undefined,
-          tone: typeof body.instructions.tone === "string" ? body.instructions.tone : undefined,
-          hardRules:
-            typeof body.instructions.hardRules === "string" ? body.instructions.hardRules : undefined,
-          doList: typeof body.instructions.doList === "string" ? body.instructions.doList : undefined,
-          dontList:
-            typeof body.instructions.dontList === "string" ? body.instructions.dontList : undefined,
-        }
-      : undefined;
 
   try {
-    const prisma = getPrismaClient();
     const brief = await prisma.brief.findFirst({
-      where: { id: body.briefId, workspaceId: auth.context.workspaceId },
+      where: { id: body.briefId, workspaceId: context.workspaceId },
     });
     if (!brief) {
       return NextResponse.json({ error: "Brief not found." }, { status: 404 });
@@ -105,7 +103,7 @@ export async function POST(request: Request) {
     }
 
     const repos = await prisma.repoAccess.findMany({
-      where: { id: { in: repoIds }, workspaceId: auth.context.workspaceId },
+      where: { id: { in: repoIds }, workspaceId: context.workspaceId },
     });
     if (repos.length !== repoIds.length) {
       return NextResponse.json({ error: "One or more repos were not found." }, { status: 404 });
@@ -113,7 +111,7 @@ export async function POST(request: Request) {
     const repoNames = repos.map((repo) => repo.repo);
     const repoTags = Array.from(new Set(repos.map((repo) => repo.projectTag)));
 
-    if (!brandTag && !instructions?.tag && repoTags.length > 1) {
+    if (!brandTag && repoTags.length > 1) {
       return NextResponse.json(
         { error: "Brand selection is required when using multiple repo tags." },
         { status: 400 }
@@ -122,7 +120,7 @@ export async function POST(request: Request) {
 
     const evidenceDocs = brief.evidenceBundleId
       ? await prisma.evidenceItem.findMany({
-          where: { bundleId: brief.evidenceBundleId, type: "DOCUMENTATION", workspaceId: auth.context.workspaceId },
+          where: { bundleId: brief.evidenceBundleId, type: "DOCUMENTATION", workspaceId: context.workspaceId },
           orderBy: { title: "asc" },
           take: 5,
         })
@@ -132,7 +130,7 @@ export async function POST(request: Request) {
           where: {
             bundleId: brief.evidenceBundleId,
             type: { not: "DOCUMENTATION" },
-            workspaceId: auth.context.workspaceId,
+            workspaceId: context.workspaceId,
           },
           orderBy: { occurredAt: "desc" },
           take: 20,
@@ -140,15 +138,20 @@ export async function POST(request: Request) {
       : [];
     const evidenceItems = [...evidenceDocs, ...evidenceRecent];
 
-    const stylePreset = getStylePreset(stylePresetId);
-    const instructionContext = await resolveInstructionContext({
-      workspaceId: auth.context.workspaceId,
-      userId: auth.context.user.id,
+    const resolvedStylePresetId = await resolveStylePresetId({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
       stylePresetId,
-      orgTag: brandTag ?? instructions?.tag ?? repoTags[0],
-      orgOverride: instructions,
+    });
+    const stylePreset = getStylePreset(resolvedStylePresetId);
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
+      stylePresetId: resolvedStylePresetId,
+      orgTag: brandTag ?? repoTags[0],
       context: [`Platform: ${platform}`],
     });
+    const openai = await getOpenAIForWorkspace(context.workspaceId);
     const text = await generatePost({
       briefText: brief.summary,
       platform,
@@ -160,14 +163,13 @@ export async function POST(request: Request) {
         content: item.content,
       })),
       stylePreset,
-      brandInstructions:
-        instructions ?? (brandTag ? { tag: brandTag } : repoTags[0] ? { tag: repoTags[0] } : undefined),
       instructionContext,
+      openai,
     });
 
     const post = await prisma.post.create({
       data: {
-        workspaceId: auth.context.workspaceId,
+        workspaceId: context.workspaceId,
         projectId: brief.projectId,
         platform,
         title: `AI post (${platform})`,
@@ -180,7 +182,7 @@ export async function POST(request: Request) {
           stylePresetId: stylePreset.id,
           repoIds,
           repoNames,
-          brandTag: brandTag ?? instructions?.tag,
+          brandTag: brandTag ?? repoTags[0],
           evidenceBundleId: brief.evidenceBundleId ?? undefined,
         },
         claims: [],
@@ -191,9 +193,10 @@ export async function POST(request: Request) {
       data: {
         actor: "system:ai",
         action: "generate_post",
+        actionLabel: getAuditLabel("generate_post"),
         entityType: "Post",
         entityId: post.id,
-        workspaceId: auth.context.workspaceId,
+        workspaceId: context.workspaceId,
         note: `Post generated for brief ${brief.id}.`,
         metadata: { briefId: brief.id, platform, model: "gpt-5-mini", repoIds, repoNames, stylePresetId: stylePreset.id },
       },

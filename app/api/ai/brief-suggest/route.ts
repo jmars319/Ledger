@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { generateBrief } from "@/lib/ai/generateBrief";
 import { requireApiContext } from "@/lib/auth/api";
-import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { resolveInstructionContext, resolveStylePresetId } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
 
 export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
@@ -10,28 +11,25 @@ export async function POST(request: Request) {
   }
   const auth = await requireApiContext("AI_BRIEFS");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   const body = await request.json();
   const bundleId = typeof body?.bundleId === "string" ? body.bundleId : "";
   const stylePresetId = typeof body?.stylePresetId === "string" ? body.stylePresetId : undefined;
-  const instructions =
-    body.instructions && typeof body.instructions === "object"
-      ? {
-          tag: typeof body.instructions.tag === "string" ? body.instructions.tag : undefined,
-          tone: typeof body.instructions.tone === "string" ? body.instructions.tone : undefined,
-          hardRules:
-            typeof body.instructions.hardRules === "string" ? body.instructions.hardRules : undefined,
-          doList: typeof body.instructions.doList === "string" ? body.instructions.doList : undefined,
-          dontList:
-            typeof body.instructions.dontList === "string" ? body.instructions.dontList : undefined,
-        }
-      : undefined;
 
   if (!bundleId) {
     return NextResponse.json({ error: "bundleId is required." }, { status: 400 });
   }
 
-  const prisma = getPrismaClient();
   if (!("evidenceBundle" in prisma) || !("evidenceItem" in prisma)) {
     return NextResponse.json(
       { error: "Evidence tables not available. Run prisma generate and migrate." },
@@ -45,23 +43,31 @@ export async function POST(request: Request) {
   if (!bundle) {
     return NextResponse.json({ error: "Evidence bundle not found." }, { status: 404 });
   }
-  if (bundle.workspaceId !== auth.context.workspaceId) {
+  if (bundle.workspaceId !== context.workspaceId) {
     return NextResponse.json({ error: "Evidence bundle not found." }, { status: 404 });
   }
 
   const fullCoverage = await prisma.evidenceBundle.findFirst({
-    where: { repoId: bundle.repoId, scope: "FULL", workspaceId: auth.context.workspaceId },
+    where: { repoId: bundle.repoId, scope: "FULL", workspaceId: context.workspaceId },
   });
 
-  const instructionContext = await resolveInstructionContext({
-    workspaceId: auth.context.workspaceId,
-    userId: auth.context.user.id,
+  const resolvedStylePresetId = await resolveStylePresetId({
+    workspaceId: context.workspaceId,
+    userId: context.user.id,
     stylePresetId,
-    orgTag: instructions?.tag,
-    orgOverride: instructions,
+  });
+  const repo = await prisma.repoAccess.findFirst({
+    where: { id: bundle.repoId, workspaceId: context.workspaceId },
+  });
+  const instructionContext = await resolveInstructionContext({
+    workspaceId: context.workspaceId,
+    userId: context.user.id,
+    stylePresetId: resolvedStylePresetId,
+    orgTag: repo?.projectTag,
     context: [`Repo: ${bundle.repoFullName}`],
   });
 
+  const openai = await getOpenAIForWorkspace(context.workspaceId);
   const text = await generateBrief({
     repoFullName: bundle.repoFullName,
     items: bundle.items.map((item) => ({
@@ -80,6 +86,7 @@ export async function POST(request: Request) {
       fullCoverageComplete: Boolean(fullCoverage),
     },
     instructionContext,
+    openai,
   });
 
   return NextResponse.json({ summary: text });

@@ -1,4 +1,5 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/ai/client";
 import type { ContentType } from "@/lib/content/types";
 import type { StylePreset } from "@/lib/content/stylePresets";
@@ -32,6 +33,7 @@ export const generateContentDraft = async (input: {
   stylePreset: StylePreset;
   sourceText: string;
   instructionContext?: InstructionContext;
+  openai?: OpenAI;
 }) => {
   const sourceText = input.sourceText.trim();
   if (!sourceText) {
@@ -57,7 +59,8 @@ export const generateContentDraft = async (input: {
     sourceText +
     "\n\nJSON:";
 
-  const response = await getOpenAI().responses.create({
+  const client = input.openai ?? getOpenAI();
+  const response = await client.responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

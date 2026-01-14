@@ -7,6 +7,8 @@ import {
   fetchPullRequests,
   fetchReleases,
 } from "@/lib/github/evidence";
+import { requireApiContext } from "@/lib/auth/api";
+import { getAuditLabel } from "@/lib/audit/labels";
 
 type Scope = "FULL" | "DAYS" | "AUTO" | "COMMITS";
 
@@ -17,6 +19,8 @@ export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Evidence requires STORAGE_MODE=db." }, { status: 400 });
   }
+  const auth = await requireApiContext("GITHUB_SYNC");
+  if (!auth.ok) return auth.response;
 
   const body = await request.json();
   const repoId = typeof body?.repoId === "string" ? body.repoId : "";
@@ -38,12 +42,15 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-  const repo = await prisma.repoAccess.findUnique({ where: { id: repoId } });
+  const repo = await prisma.repoAccess.findFirst({
+    where: { id: repoId, workspaceId: auth.context.workspaceId },
+  });
   if (!repo) {
     return NextResponse.json({ error: "Repo not found." }, { status: 404 });
   }
 
   const installation = await prisma.gitHubInstallation.findFirst({
+    where: { workspaceId: auth.context.workspaceId },
     orderBy: { createdAt: "desc" },
   });
   if (!installation) {
@@ -51,7 +58,7 @@ export async function POST(request: Request) {
   }
 
   const hasFull = await prisma.evidenceBundle.findFirst({
-    where: { repoId, scope: "FULL" },
+    where: { repoId, scope: "FULL", workspaceId: auth.context.workspaceId },
   });
 
   const resolvedScope: "FULL" | "DAYS" | "COMMITS" =
@@ -97,6 +104,7 @@ export async function POST(request: Request) {
 
   const bundle = await prisma.evidenceBundle.create({
     data: {
+      workspaceId: auth.context.workspaceId,
       repoId,
       repoFullName: repo.repo,
       scope: resolvedScope,
@@ -105,6 +113,7 @@ export async function POST(request: Request) {
       autoSelected,
       items: {
         create: [...docs, ...commits, ...pulls, ...releases].map((item) => ({
+          workspaceId: auth.context.workspaceId,
           type: item.type,
           title: item.title,
           body: item.body,
@@ -120,9 +129,12 @@ export async function POST(request: Request) {
   await prisma.auditLog.create({
     data: {
       actor: "system:project_assistant",
+      actorUserId: auth.context.user.id,
       action: "EVIDENCE_CAPTURED",
+      actionLabel: getAuditLabel("EVIDENCE_CAPTURED"),
       entityType: "EvidenceBundle",
       entityId: bundle.id,
+      workspaceId: auth.context.workspaceId,
       metadata: { repoId, scope: resolvedScope, scopeValue, scopePage },
     },
   });

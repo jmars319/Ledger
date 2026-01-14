@@ -32,6 +32,7 @@ export const fetchInstallationRepos = async (installationId: number) => {
 
 export const syncInstallationRepos = async (
   prisma: PrismaClient,
+  workspaceId: string,
   installationDbId: string,
   installationId: number
 ) => {
@@ -41,7 +42,7 @@ export const syncInstallationRepos = async (
   await Promise.all(
     repos.map((repo) =>
       prisma.gitHubRepo.upsert({
-        where: { repoId: repo.id },
+        where: { workspaceId_repoId: { workspaceId, repoId: repo.id } },
         update: {
           fullName: repo.full_name,
           name: repo.name,
@@ -51,6 +52,7 @@ export const syncInstallationRepos = async (
           installationId: installationDbId,
         },
         create: {
+          workspaceId,
           repoId: repo.id,
           fullName: repo.full_name,
           name: repo.name,

@@ -5,7 +5,9 @@ import { getStylePreset } from "@/lib/content/stylePresets";
 import { ingestFiles, buildCombinedText } from "@/lib/content/ingest";
 import { generateContentDraft, CONTENT_DRAFT_PROMPT_VERSION } from "@/lib/ai/generateContentDraft";
 import { requireApiContext } from "@/lib/auth/api";
-import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { resolveInstructionContext, resolveStylePresetId } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
+import { getPrismaClient } from "@/lib/prisma";
 
 const getFiles = (formData: FormData) => {
   const files: File[] = [];
@@ -21,11 +23,17 @@ export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "AI draft requires STORAGE_MODE=db." }, { status: 400 });
   }
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
-  }
   const auth = await requireApiContext("AI_ASSIST");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   let type = "";
   let stylePresetId: string | undefined = undefined;
@@ -63,18 +71,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const stylePreset = getStylePreset(stylePresetId);
-    const instructionContext = await resolveInstructionContext({
-      workspaceId: auth.context.workspaceId,
-      userId: auth.context.user.id,
+    const resolvedStylePresetId = await resolveStylePresetId({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
       stylePresetId,
+    });
+    const stylePreset = getStylePreset(resolvedStylePresetId);
+    const instructionContext = await resolveInstructionContext({
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
+      stylePresetId: resolvedStylePresetId,
       context: [`Content type: ${type}`],
     });
+    const openai = await getOpenAIForWorkspace(context.workspaceId);
     const draft = await generateContentDraft({
       type: type as never,
       stylePreset,
       sourceText: combinedText,
       instructionContext,
+      openai,
     });
 
     const aiMeta = {
@@ -86,7 +101,7 @@ export async function POST(request: Request) {
       format,
     };
 
-    const created = await createContentItem(auth.context.workspaceId, {
+    const created = await createContentItem(context.workspaceId, {
       type: type as never,
       status: "DRAFT",
       title: draft.title ?? null,
@@ -97,14 +112,14 @@ export async function POST(request: Request) {
       source: files.length ? "UPLOAD" : "MANUAL",
       aiMeta,
       format,
-    }, auth.context.user.id);
+    }, context.user.id);
 
     if (!created.ok || !created.item) {
       return NextResponse.json({ ok: false, validation: created.validation }, { status: 400 });
     }
 
     for (const attachment of attachments) {
-      await attachContent(auth.context.workspaceId, created.item.id, {
+      await attachContent(context.workspaceId, created.item.id, {
         fileName: attachment.fileName || "upload",
         mimeType: attachment.mimeType || "application/octet-stream",
         textContent: attachment.textContent,

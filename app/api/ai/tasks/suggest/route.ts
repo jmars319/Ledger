@@ -3,6 +3,7 @@ import { getPrismaClient } from "@/lib/prisma";
 import { generateTaskSuggestion } from "@/lib/ai/generateTaskSuggestion";
 import { requireApiContext } from "@/lib/auth/api";
 import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
 
 const fallbackDueAt = () => {
   const date = new Date();
@@ -12,11 +13,17 @@ const fallbackDueAt = () => {
 };
 
 export async function POST(request: Request) {
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
-  }
   const auth = await requireApiContext("AI_ASSIST");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   const body = await request.json();
   const promptText = typeof body?.promptText === "string" ? body.promptText.trim() : "";
@@ -28,19 +35,19 @@ export async function POST(request: Request) {
   try {
     let projectName: string | undefined;
     if (process.env.STORAGE_MODE === "db" && projectId) {
-      const prisma = getPrismaClient();
       const project = await prisma.project.findFirst({
-        where: { id: projectId, workspaceId: auth.context.workspaceId },
+        where: { id: projectId, workspaceId: context.workspaceId },
       });
       projectName = project?.name;
     }
 
     const instructionContext = await resolveInstructionContext({
-      workspaceId: auth.context.workspaceId,
-      userId: auth.context.user.id,
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
       context: ["Manual task suggestion"],
     });
-    const suggestion = await generateTaskSuggestion({ promptText, projectName, instructionContext });
+    const openai = await getOpenAIForWorkspace(context.workspaceId);
+    const suggestion = await generateTaskSuggestion({ promptText, projectName, instructionContext, openai });
     const dueAt = suggestion.dueAt ? new Date(suggestion.dueAt) : fallbackDueAt();
     const safeDueAt = Number.isNaN(dueAt.getTime()) ? fallbackDueAt() : dueAt;
 

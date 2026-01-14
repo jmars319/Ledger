@@ -1,4 +1,5 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/ai/client";
 import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
@@ -12,6 +13,7 @@ export const generateTaskSuggestion = async (input: {
   promptText: string;
   projectName?: string;
   instructionContext?: InstructionContext;
+  openai?: OpenAI;
 }): Promise<TaskSuggestion> => {
   const promptText = input.promptText.trim();
   if (!promptText) {
@@ -33,7 +35,8 @@ export const generateTaskSuggestion = async (input: {
     `Project: ${input.projectName ?? "Unknown"}\n` +
     `Prompt: ${promptText}\n\nJSON:`;
 
-  const response = await getOpenAI().responses.create({
+  const client = input.openai ?? getOpenAI();
+  const response = await client.responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

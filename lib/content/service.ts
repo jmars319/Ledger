@@ -1,6 +1,7 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 import type { ScheduleStatus } from "@prisma/client";
 import { getPrismaClient } from "@/lib/prisma";
+import { getAuditLabel } from "@/lib/audit/labels";
 import type {
   BlogFeature,
   CadenceTarget,
@@ -66,15 +67,20 @@ const normalizeArray = (value?: string[] | string | null) => {
 
 const createAudit = async (
   prisma: PrismaClient,
+  workspaceId: string,
   action: string,
   entityId: string,
   note?: string,
   metadata?: Prisma.InputJsonValue,
+  actorUserId?: string,
 ) =>
   prisma.auditLog.create({
     data: {
+      workspaceId,
       actor: "system:content_ops",
+      actorUserId,
       action,
+      actionLabel: getAuditLabel(action),
       entityType: "ContentItem",
       entityId,
       note,
@@ -82,7 +88,11 @@ const createAudit = async (
     },
   });
 
-export const createContentItem = async (input: CreateContentInput) => {
+export const createContentItem = async (
+  workspaceId: string,
+  input: CreateContentInput,
+  actorUserId?: string,
+) => {
   requireDb();
   const prisma = getPrismaClient();
   const status: ContentStatus = input.status ?? "DRAFT";
@@ -247,6 +257,7 @@ export const createContentItem = async (input: CreateContentInput) => {
 
   const created = await prisma.contentItem.create({
     data: {
+      workspaceId,
       type: input.type,
       status,
       title,
@@ -262,19 +273,23 @@ export const createContentItem = async (input: CreateContentInput) => {
     },
   });
 
-  await createAudit(prisma, "content_create", created.id, undefined, {
+  await createAudit(prisma, workspaceId, "content_create", created.id, undefined, {
     type: input.type,
     status,
-  });
+  }, actorUserId);
 
   return { ok: true, item: created, validation: validationResult };
 };
 
-export const listContentItems = async (filters: { type?: ContentType; status?: ContentStatus }) => {
+export const listContentItems = async (
+  workspaceId: string,
+  filters: { type?: ContentType; status?: ContentStatus },
+) => {
   requireDb();
   const prisma = getPrismaClient();
   return prisma.contentItem.findMany({
     where: {
+      workspaceId,
       type: filters.type,
       status: filters.status,
     },
@@ -283,26 +298,31 @@ export const listContentItems = async (filters: { type?: ContentType; status?: C
   });
 };
 
-export const getContentItem = async (id: string) => {
+export const getContentItem = async (workspaceId: string, id: string) => {
   requireDb();
   const prisma = getPrismaClient();
-  return prisma.contentItem.findUnique({
-    where: { id },
+  return prisma.contentItem.findFirst({
+    where: { id, workspaceId },
     include: { attachments: true, scheduleProposals: true },
   });
 };
 
-export const updateContentItem = async (id: string, updates: {
-  title?: string | null;
-  summary?: string | null;
-  body?: string | null;
-  rawInput?: string | null;
-  structured?: Prisma.InputJsonValue | null;
-  aiMeta?: Prisma.InputJsonValue | null;
-}) => {
+export const updateContentItem = async (
+  workspaceId: string,
+  id: string,
+  updates: {
+    title?: string | null;
+    summary?: string | null;
+    body?: string | null;
+    rawInput?: string | null;
+    structured?: Prisma.InputJsonValue | null;
+    aiMeta?: Prisma.InputJsonValue | null;
+    actorUserId?: string;
+  },
+) => {
   requireDb();
   const prisma = getPrismaClient();
-  const existing = await prisma.contentItem.findUnique({ where: { id } });
+  const existing = await prisma.contentItem.findFirst({ where: { id, workspaceId } });
   if (!existing) {
     return { ok: false, validation: { ok: false, errors: [{ code: "content_missing", message: "Content item not found." }], warnings: [] } };
   }
@@ -319,11 +339,12 @@ export const updateContentItem = async (id: string, updates: {
     },
   });
 
-  await createAudit(prisma, "content_update", id, undefined);
+  await createAudit(prisma, workspaceId, "content_update", id, undefined, undefined, updates.actorUserId);
   return { ok: true, item: updated, validation: { ok: true, errors: [], warnings: [] } };
 };
 
 export const createContentScheduleProposal = async (input: {
+  workspaceId: string;
   contentItemId: string;
   channel: string;
   scheduledFor: Date;
@@ -332,7 +353,9 @@ export const createContentScheduleProposal = async (input: {
 }) => {
   requireDb();
   const prisma = getPrismaClient();
-  const item = await prisma.contentItem.findUnique({ where: { id: input.contentItemId } });
+  const item = await prisma.contentItem.findFirst({
+    where: { id: input.contentItemId, workspaceId: input.workspaceId },
+  });
   if (!item) {
     return { ok: false, error: "Content item not found." };
   }
@@ -342,6 +365,7 @@ export const createContentScheduleProposal = async (input: {
 
   const proposal = await prisma.contentScheduleProposal.create({
     data: {
+      workspaceId: input.workspaceId,
       contentItemId: input.contentItemId,
       status: "NEEDS_REVIEW",
       channel: input.channel,
@@ -351,7 +375,7 @@ export const createContentScheduleProposal = async (input: {
     },
   });
 
-  await createAudit(prisma, "content_schedule_proposed", proposal.id, undefined, {
+  await createAudit(prisma, input.workspaceId, "content_schedule_proposed", proposal.id, undefined, {
     contentItemId: input.contentItemId,
     channel: input.channel,
   });
@@ -359,10 +383,16 @@ export const createContentScheduleProposal = async (input: {
   return { ok: true, proposal };
 };
 
-export const updateContentScheduleStatus = async (id: string, status: ScheduleStatus) => {
+export const updateContentScheduleStatus = async (
+  workspaceId: string,
+  id: string,
+  status: ScheduleStatus,
+) => {
   requireDb();
   const prisma = getPrismaClient();
-  const proposal = await prisma.contentScheduleProposal.findUnique({ where: { id } });
+  const proposal = await prisma.contentScheduleProposal.findFirst({
+    where: { id, workspaceId },
+  });
   if (!proposal) {
     return { ok: false, error: "Schedule proposal not found." };
   }
@@ -372,14 +402,20 @@ export const updateContentScheduleStatus = async (id: string, status: ScheduleSt
     data: { status },
   });
 
-  await createAudit(prisma, "content_schedule_status", proposal.id, undefined, { status });
+  await createAudit(prisma, workspaceId, "content_schedule_status", proposal.id, undefined, { status });
   return { ok: true, proposal: updated };
 };
 
-export const updateContentStatus = async (id: string, status: ContentStatus, note?: string) => {
+export const updateContentStatus = async (
+  workspaceId: string,
+  id: string,
+  status: ContentStatus,
+  note?: string,
+  actorUserId?: string,
+) => {
   requireDb();
   const prisma = getPrismaClient();
-  const item = await prisma.contentItem.findUnique({ where: { id } });
+  const item = await prisma.contentItem.findFirst({ where: { id, workspaceId } });
   if (!item) {
     return { ok: false, validation: { ok: false, errors: [{ code: "content_missing", message: "Content item not found." }], warnings: [] } };
   }
@@ -400,16 +436,23 @@ export const updateContentStatus = async (id: string, status: ContentStatus, not
     where: { id },
     data: { status },
   });
-  await createAudit(prisma, "content_status", id, note, { status });
+  await createAudit(prisma, workspaceId, "content_status", id, note, { status }, actorUserId);
   return { ok: true, item: updated, validation: { ok: true, errors: [], warnings: [] } };
 };
 
 export const attachContent = async (
+  workspaceId: string,
   contentItemId: string,
   attachment: { fileName: string; mimeType: string; textContent: string },
 ) => {
   requireDb();
   const prisma = getPrismaClient();
+  const existing = await prisma.contentItem.findFirst({
+    where: { id: contentItemId, workspaceId },
+  });
+  if (!existing) {
+    return null;
+  }
   return prisma.contentAttachment.create({
     data: {
       contentItemId,
@@ -420,7 +463,12 @@ export const attachContent = async (
   });
 };
 
-export const importProjectNotes = async (csvText: string, status: ContentStatus = "DRAFT") => {
+export const importProjectNotes = async (
+  workspaceId: string,
+  csvText: string,
+  status: ContentStatus = "DRAFT",
+  actorUserId?: string,
+) => {
   requireDb();
   const prisma = getPrismaClient();
   const rows = parseProjectNoteRows(csvText);
@@ -436,6 +484,7 @@ export const importProjectNotes = async (csvText: string, status: ContentStatus 
 
     const item = await prisma.contentItem.create({
       data: {
+        workspaceId,
         type: "PROJECT_NOTE",
         status,
         title: row.metric,
@@ -459,7 +508,15 @@ export const importProjectNotes = async (csvText: string, status: ContentStatus 
   }
 
   if (created.length) {
-    await createAudit(prisma, "content_import", created[0], `Imported ${created.length} project notes.`);
+    await createAudit(
+      prisma,
+      workspaceId,
+      "content_import",
+      created[0],
+      `Imported ${created.length} project notes.`,
+      undefined,
+      actorUserId,
+    );
   }
 
   return { createdCount: created.length, errors: results };
@@ -511,11 +568,12 @@ const validatePromotion = async (input: {
   return { ok: true, errors: [], warnings: [] };
 };
 
-export const getContentStatus = async () => {
+export const getContentStatus = async (workspaceId: string) => {
   requireDb();
   const prisma = getPrismaClient();
   const grouped = await prisma.contentItem.groupBy({
     by: ["type", "status"],
+    where: { workspaceId },
     _count: { _all: true },
   });
 
@@ -526,7 +584,7 @@ export const getContentStatus = async () => {
   });
 
   const cadenceItems = await prisma.contentItem.findMany({
-    where: { cadenceTarget: { not: null } },
+    where: { cadenceTarget: { not: null }, workspaceId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -557,11 +615,12 @@ export const getContentStatus = async () => {
   return { counts, reminders };
 };
 
-export const getCoverageMatrix = async () => {
+export const getCoverageMatrix = async (workspaceId: string) => {
   requireDb();
   const prisma = getPrismaClient();
   const items = await prisma.contentItem.findMany({
     where: {
+      workspaceId,
       type: { in: ["BLOG_FEATURE", "SYSTEMS_MEMO", "FIELD_NOTE"] },
       topics: { isEmpty: false },
     },

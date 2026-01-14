@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   const installationId = Number(installationIdParam);
   const cookieStore = await cookies();
   const storedState = cookieStore.get(stateCookie)?.value ?? "";
+  const [storedNonce, storedWorkspaceId] = storedState.split(":");
 
   const redirectWithClear = (path: string) => {
     const response = NextResponse.redirect(new URL(path, request.url));
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     return response;
   };
 
-  if (!state || !storedState || state !== storedState) {
+  if (!state || !storedNonce || state !== storedNonce || !storedWorkspaceId) {
     return redirectWithClear("/settings/integrations/github?error=state");
   }
 
@@ -44,12 +45,14 @@ export async function GET(request: Request) {
     const accountType = installationBody.account?.type ?? "Unknown";
 
     const installation = await prisma.gitHubInstallation.upsert({
-      where: { installationId },
+      where: {
+        workspaceId_installationId: { workspaceId: storedWorkspaceId, installationId },
+      },
       update: { accountLogin, accountType },
-      create: { installationId, accountLogin, accountType },
+      create: { workspaceId: storedWorkspaceId, installationId, accountLogin, accountType },
     });
 
-    await syncInstallationRepos(prisma, installation.id, installationId);
+    await syncInstallationRepos(prisma, storedWorkspaceId, installation.id, installationId);
 
     return redirectWithClear("/settings/integrations/github?connected=1");
   } catch {

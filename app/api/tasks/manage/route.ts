@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { requireApiContext } from "@/lib/auth/api";
+import { getAuditLabel } from "@/lib/audit/labels";
 
 export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     data: {
       actor: "admin",
       action: "TASK_CREATED",
+      actionLabel: getAuditLabel("TASK_CREATED"),
       entityType: "Task",
       entityId: task.id,
       workspaceId: auth.context.workspaceId,

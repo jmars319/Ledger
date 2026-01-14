@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { attachContent, createContentItem, importProjectNotes } from "@/lib/content/service";
 import { contentStatuses, contentTypes } from "@/lib/content/types";
 import { ingestFiles, buildCombinedText } from "@/lib/content/ingest";
+import { requireApiContext } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireApiContext("CONTENT_UPLOAD");
+    if (!auth.ok) return auth.response;
     const formData = await request.formData();
     const type = formData.get("type");
     const status = formData.get("status");
@@ -32,7 +35,12 @@ export async function POST(request: Request) {
     const textContent = buildCombinedText("", attachments);
 
     if (type === "PROJECT_NOTE") {
-      const result = await importProjectNotes(textContent, safeStatus);
+      const result = await importProjectNotes(
+        auth.context.workspaceId,
+        textContent,
+        safeStatus,
+        auth.context.user.id,
+      );
       return NextResponse.json({
         ok: true,
         validation: { ok: true, errors: [], warnings: [] },
@@ -41,13 +49,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const created = await createContentItem({
+    const created = await createContentItem(auth.context.workspaceId, {
       type: type as never,
       status: safeStatus,
       rawInput: textContent,
       source: "UPLOAD",
       format: format === "json" ? "json" : "md",
-    });
+    }, auth.context.user.id);
 
     if (!created.ok) {
       return NextResponse.json({ ok: false, validation: created.validation }, { status: 400 });
@@ -55,7 +63,7 @@ export async function POST(request: Request) {
 
     if (created.item) {
       for (const attachment of attachments) {
-        await attachContent(created.item.id, {
+        await attachContent(auth.context.workspaceId, created.item.id, {
           fileName: attachment.fileName || "upload",
           mimeType: attachment.mimeType || "application/octet-stream",
           textContent: attachment.textContent,

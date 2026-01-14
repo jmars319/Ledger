@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { updateContentScheduleStatus } from "@/lib/content/service";
+import { requireApiContext } from "@/lib/auth/api";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: Request, { params }: Params) {
   try {
+    const auth = await requireApiContext("SCHEDULING");
+    if (!auth.ok) return auth.response;
     const { id } = await params;
     const body = await request.json();
     const status = typeof body?.status === "string" ? body.status : "";
@@ -16,7 +19,11 @@ export async function POST(request: Request, { params }: Params) {
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
     }
 
-    const result = await updateContentScheduleStatus(id, status as never);
+    const result = await updateContentScheduleStatus(
+      auth.context.workspaceId,
+      id,
+      status as never,
+    );
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: 404 });
     }

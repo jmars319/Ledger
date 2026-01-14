@@ -1,4 +1,5 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/ai/client";
 import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
 
@@ -13,6 +14,7 @@ export const generateScheduleProposal = async (input: {
   postText: string;
   platform: string;
   instructionContext?: InstructionContext;
+  openai?: OpenAI;
 }): Promise<ScheduleSuggestion> => {
   const postText = input.postText.trim();
   if (!postText) {
@@ -34,7 +36,8 @@ export const generateScheduleProposal = async (input: {
     `Platform: ${input.platform}\n` +
     `Post:\n${postText}\n\nJSON:`;
 
-  const response = await getOpenAI().responses.create({
+  const client = input.openai ?? getOpenAI();
+  const response = await client.responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

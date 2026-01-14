@@ -3,6 +3,8 @@ import { getPrismaClient } from "@/lib/prisma";
 import { generateScheduleProposal } from "@/lib/ai/generateScheduleProposal";
 import { requireApiContext } from "@/lib/auth/api";
 import { resolveInstructionContext } from "@/lib/ai/instructions";
+import { getOpenAIForWorkspace } from "@/lib/ai/client";
+import { getAuditLabel } from "@/lib/audit/labels";
 
 const fallbackDate = () => {
   const date = new Date();
@@ -15,11 +17,17 @@ export async function POST(request: Request) {
   if (process.env.STORAGE_MODE !== "db") {
     return NextResponse.json({ error: "Scheduling requires STORAGE_MODE=db." }, { status: 400 });
   }
-  if (!process.env.OPENAI_API_KEY) {
-    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
-  }
   const auth = await requireApiContext("AI_SCHEDULER");
   if (!auth.ok) return auth.response;
+  const { context } = auth as { context: { workspaceId: string; user: { id: string } } };
+  const prisma = getPrismaClient();
+  const workspaceKey = await prisma.workspaceApiKey.findUnique({
+    where: { workspaceId: context.workspaceId },
+  });
+  const aiConfigured = Boolean(process.env.OPENAI_API_KEY) || Boolean(workspaceKey?.apiKeyCipher);
+  if (!aiConfigured) {
+    return NextResponse.json({ error: "AI assist not configured." }, { status: 400 });
+  }
 
   const body = await request.json();
   const postId = typeof body?.postId === "string" ? body.postId : "";
@@ -28,9 +36,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const prisma = getPrismaClient();
     const post = await prisma.post.findFirst({
-      where: { id: postId, workspaceId: auth.context.workspaceId },
+      where: { id: postId, workspaceId: context.workspaceId },
     });
     if (!post) {
       return NextResponse.json({ error: "Post not found." }, { status: 404 });
@@ -48,14 +55,16 @@ export async function POST(request: Request) {
           : "";
 
     const instructionContext = await resolveInstructionContext({
-      workspaceId: auth.context.workspaceId,
-      userId: auth.context.user.id,
+      workspaceId: context.workspaceId,
+      userId: context.user.id,
       context: [`Platform: ${post.platform}`],
     });
+    const openai = await getOpenAIForWorkspace(context.workspaceId);
     const suggestion = await generateScheduleProposal({
       postText: postText || post.title,
       platform: post.platform,
       instructionContext,
+      openai,
     });
 
     const scheduledFor = new Date(suggestion.scheduledFor);
@@ -64,7 +73,7 @@ export async function POST(request: Request) {
 
     const schedule = await prisma.scheduleProposal.create({
       data: {
-        workspaceId: auth.context.workspaceId,
+        workspaceId: context.workspaceId,
         projectId: post.projectId,
         status: "NEEDS_REVIEW",
         items: {
@@ -82,9 +91,10 @@ export async function POST(request: Request) {
       data: {
         actor: "system:ai",
         action: "SCHEDULE_PROPOSED",
+        actionLabel: getAuditLabel("SCHEDULE_PROPOSED"),
         entityType: "ScheduleProposal",
         entityId: schedule.id,
-        workspaceId: auth.context.workspaceId,
+        workspaceId: context.workspaceId,
         metadata: {
           postId: post.id,
           channel,

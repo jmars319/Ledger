@@ -1,4 +1,5 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/ai/client";
 import type { StylePreset } from "@/lib/content/stylePresets";
 import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
@@ -36,6 +37,7 @@ type PostInput = {
   };
   stylePreset?: StylePreset;
   instructionContext?: InstructionContext;
+  openai?: OpenAI;
 };
 
 const platformInstructions: Record<NonNullable<PostInput["platform"]>, string> = {
@@ -103,7 +105,8 @@ export async function generatePost(input: PostInput): Promise<string> {
     `Brief:\n${briefText}\n\n` +
     "Post:";
 
-  const response = await getOpenAI().responses.create({
+  const client = input.openai ?? getOpenAI();
+  const response = await client.responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });

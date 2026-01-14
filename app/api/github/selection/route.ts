@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getPrismaClient } from "@/lib/prisma";
 import { hasGitHubEnv } from "@/lib/github/env";
+import { requireApiContext } from "@/lib/auth/api";
 
 export async function POST(request: Request) {
+  const auth = await requireApiContext("GITHUB");
+  if (!auth.ok) return auth.response;
+
   if (process.env.STORAGE_MODE !== "db" || !hasGitHubEnv()) {
     return NextResponse.json({ error: "GitHub not configured." }, { status: 400 });
   }
@@ -25,6 +29,7 @@ export async function POST(request: Request) {
 
   const prisma = getPrismaClient();
   const installation = await prisma.gitHubInstallation.findFirst({
+    where: { workspaceId: auth.context.workspaceId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -34,7 +39,7 @@ export async function POST(request: Request) {
 
   const updates = [
     prisma.gitHubRepo.updateMany({
-      where: { installationId: installation.id },
+      where: { installationId: installation.id, workspaceId: auth.context.workspaceId },
       data: { selected: false },
     }),
   ];
@@ -42,7 +47,11 @@ export async function POST(request: Request) {
   if (repoIds.length) {
     updates.push(
       prisma.gitHubRepo.updateMany({
-        where: { installationId: installation.id, repoId: { in: repoIds } },
+        where: {
+          installationId: installation.id,
+          repoId: { in: repoIds },
+          workspaceId: auth.context.workspaceId,
+        },
         data: { selected: true },
       })
     );
@@ -51,30 +60,38 @@ export async function POST(request: Request) {
   await prisma.$transaction(updates);
 
   const selectedRepos = await prisma.gitHubRepo.findMany({
-    where: { installationId: installation.id, selected: true },
+    where: { installationId: installation.id, selected: true, workspaceId: auth.context.workspaceId },
     orderBy: { fullName: "asc" },
   });
 
-  const repoAccessIds = selectedRepos.map((repo) => `github-${repo.repoId}`);
+  const repoAccessIds = selectedRepos.map(
+    (repo) => `github-${auth.context.workspaceId}-${repo.repoId}`
+  );
 
   await prisma.repoAccess.deleteMany({
-    where: repoAccessIds.length
-      ? { AND: [{ id: { startsWith: "github-" } }, { id: { notIn: repoAccessIds } }] }
-      : { id: { startsWith: "github-" } },
+    where: {
+      workspaceId: auth.context.workspaceId,
+      ...(repoAccessIds.length
+        ? { AND: [{ id: { startsWith: "github-" } }, { id: { notIn: repoAccessIds } }] }
+        : { id: { startsWith: "github-" } }),
+    },
   });
 
   if (!selectedRepos.some((repo) => repo.fullName === "jason_marshall/ledger")) {
-    await prisma.repoAccess.deleteMany({ where: { repo: "jason_marshall/ledger" } });
+    await prisma.repoAccess.deleteMany({
+      where: { repo: "jason_marshall/ledger", workspaceId: auth.context.workspaceId },
+    });
   }
 
   await Promise.all(
     selectedRepos.map((repo) => {
       const defaultTag = repo.name.toLowerCase() === "ledger" ? "LEDGER_INTERNAL" : "JAMARQ";
       return prisma.repoAccess.upsert({
-        where: { id: `github-${repo.repoId}` },
+        where: { id: `github-${auth.context.workspaceId}-${repo.repoId}` },
         update: { repo: repo.fullName },
         create: {
-          id: `github-${repo.repoId}`,
+          id: `github-${auth.context.workspaceId}-${repo.repoId}`,
+          workspaceId: auth.context.workspaceId,
           repo: repo.fullName,
           projectTag: defaultTag,
           enabled: true,

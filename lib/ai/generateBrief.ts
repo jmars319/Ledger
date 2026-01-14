@@ -1,4 +1,5 @@
 import "server-only";
+import type OpenAI from "openai";
 import { getOpenAI } from "@/lib/ai/client";
 import type { StylePreset } from "@/lib/content/stylePresets";
 import { buildInstructionBlock, type InstructionContext } from "@/lib/ai/instructions";
@@ -34,6 +35,7 @@ export async function generateBrief(input: {
     dontList?: string;
   };
   instructionContext?: InstructionContext;
+  openai?: OpenAI;
 }): Promise<string> {
   if (!input.items.length) {
     throw new Error("No evidence items provided.");
@@ -98,7 +100,8 @@ export async function generateBrief(input: {
     items +
     "\n\nBrief:";
 
-  const response = await getOpenAI().responses.create({
+  const client = input.openai ?? getOpenAI();
+  const response = await client.responses.create({
     model: "gpt-5-mini",
     input: prompt,
   });
