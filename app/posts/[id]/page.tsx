@@ -5,6 +5,7 @@ import ReviewActions from "@/app/components/ReviewActions";
 import PostSchedulePanel from "@/app/posts/PostSchedulePanel";
 import { getStore } from "@/lib/store";
 import { notFound } from "next/navigation";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 export const dynamic = "force-dynamic";
 
@@ -13,25 +14,23 @@ export default async function PostPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ token?: string; status?: string; type?: string }>;
+  searchParams?: Promise<{ status?: string; type?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const resolvedParams = await params;
   const queryParams = await searchParams;
-  const token = queryParams?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const post = await store.getPost(resolvedParams.id);
   if (!post) {
     notFound();
   }
   const archiveLink = (() => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (queryParams?.status) nextParams.set("status", queryParams.status);
     return nextParams.toString() ? `/posts/archive?${nextParams.toString()}` : "/posts/archive";
   })();
   const backLink = (() => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (queryParams?.type) nextParams.set("type", queryParams.type);
     return nextParams.toString() ? `/inbox?${nextParams.toString()}` : "/inbox";
   })();
@@ -44,7 +43,9 @@ export default async function PostPage({
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title={post.title}
       subtitle={`Status: ${post.status}`}
       actions={
@@ -89,8 +90,8 @@ export default async function PostPage({
           </ul>
         </div>
         <div className="space-y-4">
-          <ReviewActions id={post.id} kind="posts" token={token} />
-          <PostSchedulePanel postId={post.id} postStatus={post.status} token={token} />
+          <ReviewActions id={post.id} kind="posts" />
+          <PostSchedulePanel postId={post.id} postStatus={post.status} />
         </div>
       </section>
     </PageShell>

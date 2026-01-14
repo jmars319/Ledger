@@ -7,11 +7,9 @@ import CopyButton from "./CopyButton";
 export default function TaskActions({
   taskId,
   copyText,
-  token,
 }: {
   taskId: string;
   copyText: string;
-  token?: string;
 }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "saved" | "error">("idle");
@@ -19,7 +17,6 @@ export default function TaskActions({
   const updateTask = async (action: "done" | "skip") => {
     const res = await fetch(`/api/tasks/${taskId}/${action}`, {
       method: "POST",
-      headers: token ? { "x-admin-token": token } : {},
     });
     if (res.ok) {
       setState("saved");

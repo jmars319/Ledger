@@ -5,13 +5,9 @@ import type { Project } from "@/lib/store/types";
 
 type Props = {
   projects: Project[];
-  token?: string;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function ProjectsClient({ projects, token }: Props) {
+export default function ProjectsClient({ projects }: Props) {
   const [items, setItems] = useState<Project[]>(projects);
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
@@ -38,7 +34,6 @@ export default function ProjectsClient({ projects, token }: Props) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({ name: trimmedName, tag: trimmedTag }),
     });

@@ -3,6 +3,7 @@ import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
 import type { Post, ScheduleProposal } from "@/lib/store/types";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -16,29 +17,30 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; type?: string }>;
+  searchParams?: Promise<{ type?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const data = await store.listInbox();
   const typeFilter = params?.type ?? "all";
   const posts = typeFilter === "schedules" ? [] : data.posts;
   const schedules = typeFilter === "posts" ? [] : data.schedules;
   const archiveLink = withParams("/inbox/archive", {
-    token,
     type: typeFilter === "all" ? undefined : typeFilter,
   });
-  const newPostLink = withParams("/posts/new", { token });
-  const manageSchedulesLink = withParams("/schedules/manage", { token });
+  const newPostLink = "/posts/new";
+  const manageSchedulesLink = "/schedules/manage";
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
-    withParams("/inbox", { token, type: value === "all" ? undefined : value });
+    withParams("/inbox", { type: value === "all" ? undefined : value });
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Inbox"
       subtitle="Review queue for posts and schedule proposals."
       actions={
@@ -92,7 +94,6 @@ export default async function InboxPage({
                 <Link
                   key={post.id}
                   href={withParams(`/posts/${post.id}`, {
-                    token,
                     type: typeFilter === "all" ? undefined : typeFilter,
                   })}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"
@@ -118,7 +119,6 @@ export default async function InboxPage({
                 <Link
                   key={schedule.id}
                   href={withParams(`/schedules/${schedule.id}`, {
-                    token,
                     type: typeFilter === "all" ? undefined : typeFilter,
                   })}
                   className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm text-slate-200 hover:border-slate-600"

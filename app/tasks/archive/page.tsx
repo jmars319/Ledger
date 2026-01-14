@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -15,11 +16,11 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function TasksArchivePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; status?: string }>;
+  searchParams?: Promise<{ status?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const statusFilter = params?.status ?? "all";
   const tasks = (await store.listTasks()).filter((task) => {
     if (task.status === "PENDING") return false;
@@ -33,17 +34,18 @@ export default async function TasksArchivePage({
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
-    withParams("/tasks/archive", { token, status: value === "all" ? undefined : value });
+    withParams("/tasks/archive", { status: value === "all" ? undefined : value });
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Tasks archive"
       subtitle="Completed or skipped manual tasks."
       actions={
         <Link
           href={withParams("/tasks", {
-            token,
             status: statusFilter === "all" ? undefined : statusFilter,
           })}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"

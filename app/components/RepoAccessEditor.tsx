@@ -5,11 +5,9 @@ import type { RepoAccess } from "@/lib/store/types";
 
 export default function RepoAccessEditor({
   repos,
-  token,
   brandOptions = ["JAMARQ", "TENRA"],
 }: {
   repos: RepoAccess[];
-  token?: string;
   brandOptions?: string[];
 }) {
   const [items, setItems] = useState<RepoAccess[]>(repos);
@@ -25,7 +23,6 @@ export default function RepoAccessEditor({
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { "x-admin-token": token } : {}),
       },
       body: JSON.stringify({ repos: items }),
     });

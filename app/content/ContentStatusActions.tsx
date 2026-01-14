@@ -5,7 +5,7 @@ import type { ValidationIssue } from "@/lib/content/types";
 
 const statuses = ["DRAFT", "READY", "APPROVED", "REJECTED", "ARCHIVED"] as const;
 
-export default function ContentStatusActions({ id, token }: { id: string; token?: string }) {
+export default function ContentStatusActions({ id }: { id: string }) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<ValidationIssue[]>([]);
   const [warnings, setWarnings] = useState<ValidationIssue[]>([]);
@@ -15,11 +15,9 @@ export default function ContentStatusActions({ id, token }: { id: string; token?
     setError([]);
     setWarnings([]);
     setLastAttemptedStatus(nextStatus);
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["x-admin-token"] = token;
     const res = await fetch(`/api/content/items/${id}/status`, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: nextStatus }),
     });
     const data = await res.json();

@@ -1,17 +1,42 @@
 import PageShell from "@/app/components/PageShell";
 import { listContentItems } from "@/lib/content/service";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 export default async function ProjectNotesPage({
   searchParams,
 }: {
-  searchParams?: { token?: string };
+  searchParams?: Record<string, string>;
 }) {
-  const token = searchParams?.token;
+  void searchParams;
+  const { workspace, user, features } = await requireWorkspaceContext();
   const isDb = process.env.STORAGE_MODE === "db";
+  const enabled = user.isAdmin || features.CONTENT_OPS;
+
+  if (!enabled) {
+    return (
+      <PageShell
+        title="Project Notes"
+        subtitle="Content Ops is disabled for this workspace."
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+      >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+          Ask a workspace owner to enable Content Ops in Settings.
+        </div>
+      </PageShell>
+    );
+  }
 
   if (!isDb) {
     return (
-      <PageShell token={token} title="Project Notes" subtitle="Content Ops requires DB mode.">
+      <PageShell
+        title="Project Notes"
+        subtitle="Content Ops requires DB mode."
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+      >
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
           Set `STORAGE_MODE=db` and `DATABASE_URL`.
         </div>
@@ -19,7 +44,7 @@ export default async function ProjectNotesPage({
     );
   }
 
-  const items = await listContentItems({ type: "PROJECT_NOTE" });
+  const items = await listContentItems(workspace.id, { type: "PROJECT_NOTE" });
   const grouped = items.reduce<Record<string, typeof items>>((acc, item) => {
     const slug = item.relatedSlugs[0] || "unspecified";
     acc[slug] = acc[slug] ?? [];
@@ -29,9 +54,11 @@ export default async function ProjectNotesPage({
 
   return (
     <PageShell
-      token={token}
       title="Project Notes"
       subtitle="Case study deltas grouped by slug."
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
     >
       <div className="space-y-6">
         {Object.entries(grouped).length === 0 ? (

@@ -35,7 +35,14 @@ type GeneratedDraft = {
   };
 };
 
-export default function ContentNewClient({ token }: { token?: string }) {
+type StyleOption = {
+  id: string;
+  name: string;
+  description?: string | null;
+  source: "preset" | "workspace";
+};
+
+export default function ContentNewClient() {
   const [type, setType] = useState("FIELD_NOTE");
   const [status, setStatus] = useState("DRAFT");
   const [title, setTitle] = useState("");
@@ -56,6 +63,14 @@ export default function ContentNewClient({ token }: { token?: string }) {
   const [generatedDraft, setGeneratedDraft] = useState<GeneratedDraft | null>(null);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const [stylePresetId, setStylePresetId] = useState(stylePresets[0]?.id ?? "neutral-brief");
+  const [styleOptions, setStyleOptions] = useState<StyleOption[]>(
+    stylePresets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      source: "preset",
+    })),
+  );
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
 
@@ -73,9 +88,8 @@ export default function ContentNewClient({ token }: { token?: string }) {
 
   const apiFetch = useCallback(async (url: string, init: RequestInit) => {
     const headers = new Headers(init.headers || {});
-    if (token) headers.set("x-admin-token", token);
     return fetch(url, { ...init, headers });
-  }, [token]);
+  }, []);
 
   const resetFeedback = () => {
     setErrors([]);
@@ -110,6 +124,47 @@ export default function ContentNewClient({ token }: { token?: string }) {
       }
     };
     void loadStatus();
+  }, [apiFetch]);
+
+  useEffect(() => {
+    const loadStyles = async () => {
+      try {
+        const [stylesRes, prefRes] = await Promise.all([
+          apiFetch("/api/workspaces/styles", { method: "GET" }),
+          apiFetch("/api/workspaces/style-preference", { method: "GET" }),
+        ]);
+        if (stylesRes.ok) {
+          const data = await stylesRes.json();
+          const workspaceStyles = Array.isArray(data?.styles)
+            ? data.styles.map((style: { id: string; name: string; description?: string | null }) => ({
+                id: style.id,
+                name: style.name,
+                description: style.description ?? null,
+                source: "workspace" as const,
+              }))
+            : [];
+          setStyleOptions([
+            ...stylePresets.map((preset) => ({
+              id: preset.id,
+              name: preset.name,
+              description: preset.description,
+              source: "preset" as const,
+            })),
+            ...workspaceStyles,
+          ]);
+        }
+        if (prefRes.ok) {
+          const data = await prefRes.json();
+          const preferred = data?.preference?.defaultStyleId;
+          if (typeof preferred === "string" && preferred) {
+            setStylePresetId(preferred);
+          }
+        }
+      } catch {
+        // keep defaults
+      }
+    };
+    void loadStyles();
   }, [apiFetch]);
 
   const handleCreate = async () => {
@@ -375,7 +430,7 @@ export default function ContentNewClient({ token }: { token?: string }) {
           <div className="mt-3 text-xs text-rose-300">{aiStatus ?? "AI Assist is not configured."}</div>
         ) : null}
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {stylePresets.map((preset) => (
+          {styleOptions.map((preset) => (
             <button
               key={preset.id}
               type="button"
@@ -387,7 +442,9 @@ export default function ContentNewClient({ token }: { token?: string }) {
               }`}
             >
               <div className="font-semibold">{preset.name}</div>
-              <div className="mt-1 text-xs text-slate-400">{preset.description}</div>
+              <div className="mt-1 text-xs text-slate-400">
+                {preset.description || (preset.source === "workspace" ? "Workspace style." : "Preset style.")}
+              </div>
             </button>
           ))}
         </div>
@@ -471,7 +528,7 @@ export default function ContentNewClient({ token }: { token?: string }) {
             {generatedDraft.id ? (
               <div className="mt-4">
                 <Link
-                  href={`/content/${generatedDraft.id}${token ? `?token=${encodeURIComponent(token)}` : ""}`}
+                  href={`/content/${generatedDraft.id}`}
                   className="text-xs text-emerald-200 underline"
                 >
                   Open draft for editing

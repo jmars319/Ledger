@@ -6,13 +6,9 @@ import type { Project, Task } from "@/lib/store/types";
 type Props = {
   tasks: Task[];
   projects: Project[];
-  token?: string;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function TasksManageClient({ tasks, projects, token }: Props) {
+export default function TasksManageClient({ tasks, projects }: Props) {
   const [items, setItems] = useState<Task[]>(tasks);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [title, setTitle] = useState("");
@@ -61,7 +57,6 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         projectId,
@@ -102,7 +97,6 @@ export default function TasksManageClient({ tasks, projects, token }: Props) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         promptText: aiPrompt.trim(),

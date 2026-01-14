@@ -18,11 +18,9 @@ type ScheduleProposal = {
 export default function PostSchedulePanel({
   postId,
   postStatus,
-  token,
 }: {
   postId: string;
   postStatus: string;
-  token?: string;
 }) {
   const [proposal, setProposal] = useState<ScheduleProposal | null>(null);
   const [suggestion, setSuggestion] = useState<{ rationale?: string; assumptions?: string } | null>(null);
@@ -30,7 +28,6 @@ export default function PostSchedulePanel({
   const [error, setError] = useState<string | null>(null);
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["x-admin-token"] = token;
 
   const propose = async () => {
     setLoading(true);

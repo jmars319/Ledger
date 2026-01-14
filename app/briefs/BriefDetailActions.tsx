@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function BriefDetailActions({ id, token }: { id: string; token?: string }) {
+export default function BriefDetailActions({ id }: { id: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
@@ -13,14 +13,13 @@ export default function BriefDetailActions({ id, token }: { id: string; token?: 
     if (!confirmDelete) return;
     const res = await fetch(`/api/briefs/${id}`, {
       method: "DELETE",
-      headers: token ? { "x-admin-token": token } : undefined,
     });
     if (!res.ok) {
       const payload = await res.json().catch(() => ({}));
       setError(payload.error ?? "Failed to delete brief.");
       return;
     }
-    router.push(token ? `/briefs?token=${encodeURIComponent(token)}` : "/briefs");
+    router.push("/briefs");
   };
 
   return (

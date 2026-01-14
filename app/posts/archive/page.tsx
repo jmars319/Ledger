@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import { getStore } from "@/lib/store";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -15,11 +16,11 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function PostArchivePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; status?: string }>;
+  searchParams?: Promise<{ status?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const statusFilter = params?.status ?? "all";
   const posts = (await store.listPosts()).filter((post) => {
     if (post.status === "NEEDS_REVIEW") return false;
@@ -33,17 +34,18 @@ export default async function PostArchivePage({
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
-    withParams("/posts/archive", { token, status: value === "all" ? undefined : value });
+    withParams("/posts/archive", { status: value === "all" ? undefined : value });
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Post archive"
       subtitle="Posts that have moved past review."
       actions={
         <Link
           href={withParams("/inbox", {
-            token,
             status: statusFilter === "all" ? undefined : statusFilter,
           })}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"
@@ -93,7 +95,6 @@ export default async function PostArchivePage({
             <Link
               key={post.id}
               href={withParams(`/posts/${post.id}`, {
-                token,
                 status: statusFilter === "all" ? undefined : statusFilter,
               })}
               className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-200 hover:border-slate-600"

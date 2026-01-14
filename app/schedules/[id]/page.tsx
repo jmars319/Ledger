@@ -3,6 +3,7 @@ import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import ReviewActions from "@/app/components/ReviewActions";
 import { getStore } from "@/lib/store";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 import { notFound } from "next/navigation";
 import type { ScheduleItem } from "@/lib/store/types";
 
@@ -13,34 +14,35 @@ export default async function SchedulePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ token?: string; status?: string; type?: string }>;
+  searchParams?: Promise<{ status?: string; type?: string }>;
 }) {
   const resolvedParams = await params;
   const queryParams = await searchParams;
-  const token = queryParams?.token;
-  const store = getStore();
+  const { workspace, user, features } = await requireWorkspaceContext();
+  const enabled = user.isAdmin || features.SCHEDULING;
+  const store = getStore(workspace.id);
   const schedule = await store.getSchedule(resolvedParams.id);
   if (!schedule) {
     notFound();
   }
   const archiveLink = (() => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (queryParams?.status) nextParams.set("status", queryParams.status);
     return nextParams.toString() ? `/schedules/archive?${nextParams.toString()}` : "/schedules/archive";
   })();
   const backLink = (() => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (queryParams?.type) nextParams.set("type", queryParams.type);
     return nextParams.toString() ? `/inbox?${nextParams.toString()}` : "/inbox";
   })();
 
   return (
     <PageShell
-      token={token}
       title="Schedule proposal"
       subtitle={`Status: ${schedule.status}`}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       actions={
         <div className="flex flex-wrap gap-2">
           <Link
@@ -61,6 +63,11 @@ export default async function SchedulePage({
       <PurposeCard>
         Review a proposed schedule, then approve or request revisions before publishing.
       </PurposeCard>
+      {!enabled ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+          Scheduling is disabled for this workspace.
+        </div>
+      ) : (
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
           <div className="text-sm font-semibold text-slate-200">Proposed items</div>
@@ -79,8 +86,9 @@ export default async function SchedulePage({
             ))}
           </div>
         </div>
-        <ReviewActions id={schedule.id} kind="schedules" token={token} />
+        <ReviewActions id={schedule.id} kind="schedules" />
       </section>
+      )}
     </PageShell>
   );
 }

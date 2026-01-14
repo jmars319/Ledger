@@ -24,10 +24,7 @@ type Repo = {
   lastSeenAt?: string | null;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function GitHubIntegrationClient({ token }: { token?: string }) {
+export default function GitHubIntegrationClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<StatusResponse | null>(null);
@@ -47,16 +44,19 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     setLoading(true);
     setError(null);
     try {
-      const statusRes = await fetch("/api/github/status", {
-        headers: authHeaders(token),
-      });
+      const statusRes = await fetch("/api/github/status");
+      if (!statusRes.ok) {
+        setStatus({ connected: false, reason: "forbidden" });
+        setRepos([]);
+        setSelectedIds(new Set());
+        setError("GitHub integration is disabled for this workspace.");
+        return;
+      }
       const statusBody = (await statusRes.json()) as StatusResponse;
       setStatus(statusBody);
 
       if (statusBody.connected) {
-        const reposRes = await fetch("/api/github/repos", {
-          headers: authHeaders(token),
-        });
+        const reposRes = await fetch("/api/github/repos");
         const reposBody = (await reposRes.json()) as { repos: Repo[] };
         const filtered = (reposBody.repos ?? []).filter(
           (repo) => repo.fullName.toLowerCase() !== "jason_marshall/ledger"
@@ -72,7 +72,7 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -89,7 +89,6 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...authHeaders(token),
           },
           body: JSON.stringify({ installationId }),
         });
@@ -100,7 +99,7 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     };
 
     void complete();
-  }, [installationIdParam, token, router, load]);
+  }, [installationIdParam, router, load]);
 
   const toggleRepo = (repoId: number) => {
     setSelectedIds((prev) => {
@@ -121,7 +120,6 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({ repoIds: Array.from(selectedIds) }),
     });
@@ -139,7 +137,6 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     setError(null);
     const res = await fetch("/api/github/sync", {
       method: "POST",
-      headers: authHeaders(token),
     });
     if (!res.ok) {
       setError("Failed to sync repos.");
@@ -154,7 +151,6 @@ export default function GitHubIntegrationClient({ token }: { token?: string }) {
     setError(null);
     const res = await fetch("/api/github/disconnect", {
       method: "POST",
-      headers: authHeaders(token),
     });
     if (!res.ok) {
       setError("Failed to disconnect GitHub.");

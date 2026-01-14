@@ -34,3 +34,5 @@ export const getAuditDisplay = (action: string): AuditDisplay => {
 
   return { label: action, detail: action };
 };
+
+export const getAuditLabel = (action: string) => getAuditDisplay(action).label;

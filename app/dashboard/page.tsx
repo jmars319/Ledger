@@ -7,21 +7,21 @@ import type { AuditLog } from "@/lib/store/types";
 import { getAuditDisplay } from "@/lib/audit/labels";
 import { getPromotionIssuesForItem } from "@/lib/content/validators";
 import { getPrismaClient } from "@/lib/prisma";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; actor?: string }>;
+  searchParams?: Promise<{ actor?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const data = await store.getDashboard();
   const actorFilter = params?.actor ?? "all";
   const isDb = process.env.STORAGE_MODE === "db";
   const archiveLink = (() => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (actorFilter !== "all") nextParams.set("actor", actorFilter);
     return nextParams.toString() ? `/dashboard/audit?${nextParams.toString()}` : "/dashboard/audit";
   })();
@@ -34,7 +34,6 @@ export default async function DashboardPage({
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (value !== "all") nextParams.set("actor", value);
     const query = nextParams.toString();
     return query ? `/dashboard?${query}` : "/dashboard";
@@ -51,15 +50,15 @@ export default async function DashboardPage({
     const prisma = getPrismaClient();
     const [contentItems, briefTotal, evidenceTotal, githubInstall] = await Promise.all([
       prisma.contentItem.findMany({
-        where: { status: { notIn: ["READY", "APPROVED", "ARCHIVED"] } },
+        where: { status: { notIn: ["READY", "APPROVED", "ARCHIVED"] }, workspaceId: workspace.id },
         orderBy: { updatedAt: "desc" },
         take: 50,
       }),
-      prisma.brief.count(),
-      prisma.evidenceBundle.count(),
-      prisma.gitHubInstallation.findFirst(),
+      prisma.brief.count({ where: { workspaceId: workspace.id } }),
+      prisma.evidenceBundle.count({ where: { workspaceId: workspace.id } }),
+      prisma.gitHubInstallation.findFirst({ where: { workspaceId: workspace.id } }),
     ]);
-    contentCount = await prisma.contentItem.count();
+    contentCount = await prisma.contentItem.count({ where: { workspaceId: workspace.id } });
     briefsCount = briefTotal;
     evidenceCount = evidenceTotal;
     githubConnected = Boolean(githubInstall);
@@ -92,7 +91,9 @@ export default async function DashboardPage({
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Dashboard"
       subtitle="Pipeline snapshot with recent audit activity."
       actions={

@@ -6,13 +6,9 @@ import type { Post, ScheduleProposal } from "@/lib/store/types";
 type Props = {
   posts: Post[];
   schedules: ScheduleProposal[];
-  token?: string;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function SchedulesManageClient({ posts, schedules, token }: Props) {
+export default function SchedulesManageClient({ posts, schedules }: Props) {
   const [items, setItems] = useState<ScheduleProposal[]>(schedules);
   const [postId, setPostId] = useState(posts[0]?.id ?? "");
   const [channel, setChannel] = useState("LinkedIn");
@@ -38,7 +34,6 @@ export default function SchedulesManageClient({ posts, schedules, token }: Props
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         postId,

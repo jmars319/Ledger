@@ -13,12 +13,10 @@ type ScheduleProposal = {
 
 export default function ContentSchedulePanel({
   contentItemId,
-  token,
   status,
   proposals,
 }: {
   contentItemId: string;
-  token?: string;
   status: string;
   proposals: ScheduleProposal[];
 }) {
@@ -27,7 +25,6 @@ export default function ContentSchedulePanel({
   const [current, setCurrent] = useState<ScheduleProposal | null>(proposals[0] ?? null);
 
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["x-admin-token"] = token;
 
   const propose = async () => {
     setLoading(true);

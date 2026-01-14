@@ -1,17 +1,42 @@
 import PageShell from "@/app/components/PageShell";
 import { getCoverageMatrix } from "@/lib/content/service";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 export default async function CoveragePage({
   searchParams,
 }: {
-  searchParams?: { token?: string };
+  searchParams?: Record<string, string>;
 }) {
-  const token = searchParams?.token;
+  void searchParams;
+  const { workspace, user, features } = await requireWorkspaceContext();
   const isDb = process.env.STORAGE_MODE === "db";
+  const enabled = user.isAdmin || features.CONTENT_OPS;
+
+  if (!enabled) {
+    return (
+      <PageShell
+        title="Coverage"
+        subtitle="Content Ops is disabled for this workspace."
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+      >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+          Ask a workspace owner to enable Content Ops in Settings.
+        </div>
+      </PageShell>
+    );
+  }
 
   if (!isDb) {
     return (
-      <PageShell token={token} title="Coverage" subtitle="Content Ops requires DB mode.">
+      <PageShell
+        title="Coverage"
+        subtitle="Content Ops requires DB mode."
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+      >
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
           Set `STORAGE_MODE=db` and `DATABASE_URL`.
         </div>
@@ -19,14 +44,16 @@ export default async function CoveragePage({
     );
   }
 
-  const data = await getCoverageMatrix();
+  const data = await getCoverageMatrix(workspace.id);
   const topics = Object.keys(data.matrix).sort();
 
   return (
     <PageShell
-      token={token}
       title="Coverage"
       subtitle="Topic coverage across blog features, systems memos, and field notes."
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
     >
       {topics.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { Brief, Project, RepoAccess } from "@/lib/store/types";
 import { stylePresets } from "@/lib/content/stylePresets";
@@ -9,13 +9,9 @@ type Props = {
   briefs: Brief[];
   projects: Project[];
   repos: RepoAccess[];
-  token?: string;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function BriefsClient({ briefs, projects, repos, token }: Props) {
+export default function BriefsClient({ briefs, projects, repos }: Props) {
   const [items, setItems] = useState<Brief[]>(briefs);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [summary, setSummary] = useState("");
@@ -24,6 +20,14 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
   const [generalFiles, setGeneralFiles] = useState<File[]>([]);
   const [repoId, setRepoId] = useState(repos[0]?.id ?? "");
   const [stylePresetId, setStylePresetId] = useState(stylePresets[0]?.id ?? "neutral-brief");
+  const [styleOptions, setStyleOptions] = useState(
+    stylePresets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      source: "preset" as const,
+    })),
+  );
   const [scopeMode, setScopeMode] = useState<"AUTO" | "FULL" | "DAYS" | "COMMITS">("AUTO");
   const [days, setDays] = useState("30");
   const [commitWindowSize, setCommitWindowSize] = useState("50");
@@ -47,17 +51,6 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
   const [activeSummary, setActiveSummary] = useState<string | null>(null);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
 
-  const instructions = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("ledger_ai_instructions_v1");
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }, []);
-
   useEffect(() => {
     const loadStatus = async () => {
       try {
@@ -71,8 +64,46 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
     void loadStatus();
   }, []);
 
-  const repoBrand = repos.find((repo) => repo.id === repoId)?.projectTag;
-  const brandInstructions = instructions.find((item) => item.tag === repoBrand);
+  useEffect(() => {
+    const loadStyles = async () => {
+      try {
+        const [stylesRes, prefRes] = await Promise.all([
+          fetch("/api/workspaces/styles"),
+          fetch("/api/workspaces/style-preference"),
+        ]);
+        if (stylesRes.ok) {
+          const data = await stylesRes.json();
+          const workspaceStyles = Array.isArray(data?.styles)
+            ? data.styles.map((style: { id: string; name: string; description?: string | null; instructions?: Record<string, unknown> }) => ({
+                id: style.id,
+                name: style.name,
+                description: style.description ?? null,
+                source: "workspace" as const,
+              }))
+            : [];
+          setStyleOptions([
+            ...stylePresets.map((preset) => ({
+              id: preset.id,
+              name: preset.name,
+              description: preset.description,
+              source: "preset" as const,
+            })),
+            ...workspaceStyles,
+          ]);
+        }
+        if (prefRes.ok) {
+          const data = await prefRes.json();
+          const preferred = data?.preference?.defaultStyleId;
+          if (typeof preferred === "string" && preferred) {
+            setStylePresetId(preferred);
+          }
+        }
+      } catch {
+        // keep defaults
+      }
+    };
+    void loadStyles();
+  }, []);
 
   const submit = async () => {
     setState("saving");
@@ -92,7 +123,6 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         projectId,
@@ -123,9 +153,6 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
     if (!confirmDelete) return;
     const res = await fetch(`/api/briefs/${id}`, {
       method: "DELETE",
-      headers: {
-        ...authHeaders(token),
-      },
     });
 
     if (!res.ok) {
@@ -160,7 +187,6 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         repoId,
@@ -194,12 +220,10 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify({
         bundleId,
         stylePresetId,
-        instructions: brandInstructions ?? undefined,
       }),
     });
 
@@ -236,9 +260,6 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
 
     const suggestRes = await fetch("/api/ai/brief-draft", {
       method: "POST",
-      headers: {
-        ...authHeaders(token),
-      },
       body: formData,
     });
 
@@ -264,10 +285,7 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
     return true;
   });
 
-  const withParams = (href: string) => {
-    if (!token) return href;
-    return `${href}?token=${encodeURIComponent(token)}`;
-  };
+  const withParams = (href: string) => href;
 
   return (
     <div className="grid gap-6">
@@ -325,9 +343,10 @@ export default function BriefsClient({ briefs, projects, repos, token }: Props) 
               onChange={(event) => setStylePresetId(event.target.value)}
               className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-100"
             >
-              {stylePresets.map((preset) => (
+              {styleOptions.map((preset) => (
                 <option key={preset.id} value={preset.id}>
-                  {preset.name} — {preset.description}
+                  {preset.name}
+                  {preset.description ? ` — ${preset.description}` : ""}
                 </option>
               ))}
             </select>

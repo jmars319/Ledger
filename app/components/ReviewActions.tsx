@@ -6,12 +6,11 @@ import { useState } from "react";
 type ReviewActionsProps = {
   id: string;
   kind: "posts" | "schedules";
-  token?: string;
 };
 
 type ActionState = "idle" | "saving" | "saved" | "error";
 
-export default function ReviewActions({ id, kind, token }: ReviewActionsProps) {
+export default function ReviewActions({ id, kind }: ReviewActionsProps) {
   const router = useRouter();
   const [note, setNote] = useState("");
   const [state, setState] = useState<ActionState>("idle");
@@ -22,7 +21,6 @@ export default function ReviewActions({ id, kind, token }: ReviewActionsProps) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { "x-admin-token": token } : {}),
       },
       body: action === "approve" ? undefined : JSON.stringify({ note }),
     });

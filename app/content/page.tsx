@@ -3,19 +3,35 @@ import Link from "next/link";
 import { getContentStatus, listContentItems } from "@/lib/content/service";
 import { contentTypes } from "@/lib/content/types";
 import { getPromotionIssuesForItem } from "@/lib/content/validators";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
-export default async function ContentDashboardPage({
-  searchParams,
-}: {
-  searchParams?: { token?: string };
-}) {
-  const token = searchParams?.token;
+export default async function ContentDashboardPage() {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const isDb = process.env.STORAGE_MODE === "db";
+  const enabled = user.isAdmin || features.CONTENT_OPS;
+
+  if (!enabled) {
+    return (
+      <PageShell
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+        title="Content"
+        subtitle="Content Ops is disabled for this workspace."
+      >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+          Ask a workspace owner to enable Content Ops in Settings.
+        </div>
+      </PageShell>
+    );
+  }
 
   if (!isDb) {
     return (
       <PageShell
-        token={token}
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
         title="Content"
         subtitle="Content Ops requires DB mode."
         actions={
@@ -31,8 +47,8 @@ export default async function ContentDashboardPage({
     );
   }
 
-  const data = await getContentStatus();
-  const recent = await listContentItems({});
+  const data = await getContentStatus(workspace.id);
+  const recent = await listContentItems(workspace.id, {});
   const needsAttention = recent
     .filter((item) => !["READY", "APPROVED", "ARCHIVED"].includes(item.status))
     .map((item) => {
@@ -55,11 +71,13 @@ export default async function ContentDashboardPage({
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Content"
       subtitle="Typed content intake with approvals and cadence tracking."
       actions={
-        <Link href={token ? `/content/new?token=${token}` : "/content/new"} className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200">
+        <Link href="/content/new" className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200">
           New content
         </Link>
       }
@@ -86,13 +104,13 @@ export default async function ContentDashboardPage({
 
       <section className="flex flex-wrap gap-3">
         <Link
-          href={token ? `/content/project-notes?token=${token}` : "/content/project-notes"}
+          href="/content/project-notes"
           className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200"
         >
           Project notes
         </Link>
         <Link
-          href={token ? `/content/coverage?token=${token}` : "/content/coverage"}
+          href="/content/coverage"
           className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200"
         >
           Coverage
@@ -126,7 +144,7 @@ export default async function ContentDashboardPage({
             {needsAttention.slice(0, 6).map((item) => (
               <Link
                 key={item.id}
-                href={token ? `/content/${item.id}?token=${token}` : `/content/${item.id}`}
+                href={`/content/${item.id}`}
                 className="rounded-lg border border-slate-800 px-3 py-2 hover:border-emerald-400/60"
               >
                 <div className="text-slate-100">{item.title}</div>
@@ -146,7 +164,7 @@ export default async function ContentDashboardPage({
             {recent.slice(0, 10).map((item) => (
               <Link
                 key={item.id}
-                href={token ? `/content/${item.id}?token=${token}` : `/content/${item.id}`}
+                href={`/content/${item.id}`}
                 className="rounded-lg border border-slate-800 px-3 py-2 hover:border-emerald-400/60"
               >
                 <div className="text-slate-100">{item.title || item.type.replace(/_/g, " ")}</div>

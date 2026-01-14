@@ -6,21 +6,43 @@ import { getRequirements } from "@/lib/content/requirementsCopy";
 import CopyButton from "@/app/components/CopyButton";
 import ContentEditor from "@/app/content/ContentEditor";
 import ContentSchedulePanel from "@/app/content/ContentSchedulePanel";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 export default async function ContentDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: { token?: string };
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const { id } = await params;
-  const token = searchParams?.token;
   const isDb = process.env.STORAGE_MODE === "db";
+  const enabled = user.isAdmin || features.CONTENT_OPS;
+
+  if (!enabled) {
+    return (
+      <PageShell
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+        title="Content detail"
+        subtitle="Content Ops is disabled for this workspace."
+      >
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
+          Ask a workspace owner to enable Content Ops in Settings.
+        </div>
+      </PageShell>
+    );
+  }
 
   if (!isDb) {
     return (
-      <PageShell token={token} title="Content detail" subtitle="Content Ops requires DB mode.">
+      <PageShell
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+        title="Content detail"
+        subtitle="Content Ops requires DB mode."
+      >
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
           Set `STORAGE_MODE=db` and `DATABASE_URL`.
         </div>
@@ -28,10 +50,15 @@ export default async function ContentDetailPage({
     );
   }
 
-  const item = await getContentItem(id);
+  const item = await getContentItem(workspace.id, id);
   if (!item) {
     return (
-      <PageShell token={token} title="Content detail">
+      <PageShell
+        workspaceName={workspace.name}
+        isAdmin={user.isAdmin}
+        features={features}
+        title="Content detail"
+      >
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-sm text-slate-300">
           Content item not found.
         </div>
@@ -51,12 +78,17 @@ export default async function ContentDetailPage({
       : null;
 
   return (
-    <PageShell token={token} title={item.title || "Content detail"} subtitle={`${item.type} · ${item.status}`}>
+    <PageShell
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
+      title={item.title || "Content detail"}
+      subtitle={`${item.type} · ${item.status}`}
+    >
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           <ContentEditor
             id={item.id}
-            token={token}
             title={item.title}
             summary={item.summary}
             body={item.body}
@@ -182,12 +214,11 @@ export default async function ContentDetailPage({
         </div>
 
         <div className="space-y-4">
-          <ContentStatusActions id={item.id} token={token} />
-          <ContentAssistPanel id={item.id} token={token} />
+          <ContentStatusActions id={item.id} />
+          <ContentAssistPanel id={item.id} />
           <ContentSchedulePanel
             contentItemId={item.id}
             status={item.status}
-            token={token}
             proposals={item.scheduleProposals ?? []}
           />
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400">

@@ -4,7 +4,6 @@ import { useState } from "react";
 
 type ContentEditorProps = {
   id: string;
-  token?: string;
   title?: string | null;
   summary?: string | null;
   body?: string | null;
@@ -14,7 +13,6 @@ type ContentEditorProps = {
 
 export default function ContentEditor({
   id,
-  token,
   title,
   summary,
   body,
@@ -47,11 +45,9 @@ export default function ContentEditor({
       }
     }
 
-    const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (token) headers["x-admin-token"] = token;
     const res = await fetch(`/api/content/items/${id}`, {
       method: "PUT",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: nextTitle,
         summary: nextSummary,

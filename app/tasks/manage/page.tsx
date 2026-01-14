@@ -2,22 +2,25 @@ import PageShell from "@/app/components/PageShell";
 import PurposeCard from "@/app/components/PurposeCard";
 import TasksManageClient from "@/app/tasks/manage/TasksManageClient";
 import { getStore } from "@/lib/store";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
-export default async function TasksManagePage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ token?: string }>;
-}) {
-  const token = (await searchParams)?.token;
-  const store = getStore();
+export default async function TasksManagePage() {
+  const { workspace, user, features } = await requireWorkspaceContext();
+  const store = getStore(workspace.id);
   const [tasks, projects] = await Promise.all([store.listTasks(), store.listProjects()]);
 
   return (
-    <PageShell token={token} title="Manage tasks" subtitle="Create and review manual tasks.">
+    <PageShell
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
+      title="Manage tasks"
+      subtitle="Create and review manual tasks."
+    >
       <PurposeCard>
         Create manual tasks tied to projects, then track them through completion.
       </PurposeCard>
-      <TasksManageClient tasks={tasks} projects={projects} token={token} />
+      <TasksManageClient tasks={tasks} projects={projects} />
     </PageShell>
   );
 }

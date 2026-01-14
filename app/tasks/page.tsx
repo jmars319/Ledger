@@ -4,6 +4,7 @@ import PurposeCard from "@/app/components/PurposeCard";
 import TaskActions from "@/app/components/TaskActions";
 import { getStore } from "@/lib/store";
 import type { Task } from "@/lib/store/types";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -17,11 +18,11 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function TasksPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; status?: string }>;
+  searchParams?: Promise<{ status?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const statusFilter = params?.status ?? "pending";
   const tasks = (await store.listTasks()).filter((task) => {
     if (statusFilter === "all") return true;
@@ -31,18 +32,19 @@ export default async function TasksPage({
     return task.status === "PENDING";
   });
   const archiveLink = withParams("/tasks/archive", {
-    token,
     status: statusFilter === "pending" ? undefined : statusFilter,
   });
-  const manageLink = withParams("/tasks/manage", { token });
+  const manageLink = "/tasks/manage";
   const chipClass = (active: boolean) =>
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) =>
-    withParams("/tasks", { token, status: value === "pending" ? undefined : value });
+    withParams("/tasks", { status: value === "pending" ? undefined : value });
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Manual tasks"
       subtitle="Upcoming items that require manual steps."
       actions={
@@ -88,7 +90,7 @@ export default async function TasksPage({
               <div className="text-xs text-slate-500">Due {new Date(task.dueAt).toLocaleString()}</div>
               <div className="mt-2 text-xs text-slate-400">Status: {task.status}</div>
             </div>
-            <TaskActions taskId={task.id} copyText={task.copyText} token={token} />
+            <TaskActions taskId={task.id} copyText={task.copyText} />
           </div>
         ))}
       </section>

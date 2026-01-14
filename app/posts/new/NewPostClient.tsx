@@ -1,32 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Brief, RepoAccess } from "@/lib/store/types";
 import { stylePresets } from "@/lib/content/stylePresets";
 
-type BrandInstruction = {
-  id: string;
-  tag: string;
-  tone: string;
-  hardRules: string;
-  doList: string;
-  dontList: string;
-};
-
 type Props = {
   briefs: Brief[];
   repos: RepoAccess[];
-  token?: string;
   aiConfigured: boolean;
 };
 
-const storageKey = "ledger_ai_instructions_v1";
+type StyleOption = {
+  id: string;
+  name: string;
+  description?: string | null;
+  source: "preset" | "workspace";
+};
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function NewPostClient({ briefs, repos, token, aiConfigured }: Props) {
+export default function NewPostClient({ briefs, repos, aiConfigured }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<"single" | "multi">("single");
   const [briefId, setBriefId] = useState<string>(briefs[0]?.id ?? "");
@@ -34,6 +26,14 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
   const [platform, setPlatform] = useState<string>("generic");
   const [multiPlatforms, setMultiPlatforms] = useState<Set<string>>(new Set());
   const [stylePresetId, setStylePresetId] = useState(stylePresets[0]?.id ?? "neutral-brief");
+  const [styleOptions, setStyleOptions] = useState<StyleOption[]>(
+    stylePresets.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      source: "preset",
+    })),
+  );
   const [singleRepoId, setSingleRepoId] = useState<string>(repos[0]?.id ?? "");
   const [multiRepoIds, setMultiRepoIds] = useState<Set<string>>(new Set());
   const [brandOverride, setBrandOverride] = useState<string>("");
@@ -41,20 +41,50 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
   const [state, setState] = useState<"idle" | "submitting" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const instructions = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return [] as BrandInstruction[];
-      const parsed = JSON.parse(raw) as BrandInstruction[];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+  useEffect(() => {
+    const loadStyles = async () => {
+      try {
+        const [stylesRes, prefRes] = await Promise.all([
+          fetch("/api/workspaces/styles"),
+          fetch("/api/workspaces/style-preference"),
+        ]);
+        if (stylesRes.ok) {
+          const data = await stylesRes.json();
+          const workspaceStyles = Array.isArray(data?.styles)
+            ? data.styles.map((style: { id: string; name: string; description?: string | null }) => ({
+                id: style.id,
+                name: style.name,
+                description: style.description ?? null,
+                source: "workspace" as const,
+              }))
+            : [];
+          setStyleOptions([
+            ...stylePresets.map((preset) => ({
+              id: preset.id,
+              name: preset.name,
+              description: preset.description,
+              source: "preset" as const,
+            })),
+            ...workspaceStyles,
+          ]);
+        }
+        if (prefRes.ok) {
+          const data = await prefRes.json();
+          const preferred = data?.preference?.defaultStyleId;
+          if (typeof preferred === "string" && preferred) {
+            setStylePresetId(preferred);
+          }
+        }
+      } catch {
+        // keep defaults
+      }
+    };
+    void loadStyles();
   }, []);
 
   const brandOptions = useMemo(
-    () => Array.from(new Set(instructions.map((item) => item.tag).filter(Boolean))),
-    [instructions]
+    () => Array.from(new Set(repos.map((repo) => repo.projectTag).filter(Boolean))),
+    [repos]
   );
 
   const selectedRepos = useMemo(() => {
@@ -73,12 +103,11 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
   );
 
   const shouldChooseBrand = mode === "multi" && selectedTags.length > 1;
+  const brandOverrideOptions = selectedTags.length ? selectedTags : brandOptions;
 
   const selectedBrandTag = shouldChooseBrand
     ? brandOverride
     : selectedTags[0] ?? brandOverride;
-
-  const selectedInstructions = instructions.find((item) => item.tag === selectedBrandTag);
 
   const toggleRepo = (id: string) => {
     setMultiRepoIds((prev) => {
@@ -145,7 +174,6 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
             repoIds,
             stylePresetId,
             brandTag: selectedBrandTag || undefined,
-            instructions: selectedInstructions || undefined,
           }
         : {
             briefId,
@@ -153,14 +181,12 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
             repoIds,
             stylePresetId,
             brandTag: selectedBrandTag || undefined,
-            instructions: selectedInstructions || undefined,
           };
 
     const res = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...authHeaders(token),
       },
       body: JSON.stringify(payload),
     });
@@ -304,7 +330,7 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
         <div className="mt-4">
           <div className="text-xs uppercase tracking-wide text-slate-500">Style preset</div>
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {stylePresets.map((preset) => (
+            {styleOptions.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
@@ -316,7 +342,9 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
                 }`}
               >
                 <div className="font-semibold">{preset.name}</div>
-                <div className="mt-1 text-xs text-slate-400">{preset.description}</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {preset.description || (preset.source === "workspace" ? "Workspace style." : "Preset style.")}
+                </div>
               </button>
             ))}
           </div>
@@ -402,7 +430,7 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
               className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-slate-100"
             >
               <option value="">Select brand</option>
-              {brandOptions.map((tag) => (
+              {brandOverrideOptions.map((tag) => (
                 <option key={tag} value={tag}>
                   {tag}
                 </option>
@@ -413,18 +441,13 @@ export default function NewPostClient({ briefs, repos, token, aiConfigured }: Pr
       </div>
 
       <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-        <div className="text-sm font-semibold text-slate-200">AI instructions</div>
+        <div className="text-sm font-semibold text-slate-200">AI context</div>
         <div className="mt-2 text-xs text-slate-500">
-          {selectedBrandTag
-            ? `Using ${selectedBrandTag} instructions.`
-            : "No brand instructions selected."}
+          {selectedBrandTag ? `Brand tag: ${selectedBrandTag}.` : "No brand tag selected."}
         </div>
-        {selectedInstructions ? (
-          <div className="mt-3 text-xs text-slate-400">
-            <div>Tone: {selectedInstructions.tone || "—"}</div>
-            <div>Hard rules: {selectedInstructions.hardRules || "—"}</div>
-          </div>
-        ) : null}
+        <div className="mt-2 text-xs text-slate-400">
+          Workspace instructions and the selected style preset will be applied automatically.
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">

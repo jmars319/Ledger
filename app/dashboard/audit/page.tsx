@@ -2,6 +2,7 @@ import Link from "next/link";
 import PageShell from "@/app/components/PageShell";
 import { getStore } from "@/lib/store";
 import { getAuditDisplay } from "@/lib/audit/labels";
+import { requireWorkspaceContext } from "@/lib/workspace/context";
 
 const withParams = (href: string, params: Record<string, string | undefined>) => {
   const nextParams = new URLSearchParams();
@@ -15,11 +16,11 @@ const withParams = (href: string, params: Record<string, string | undefined>) =>
 export default async function AuditArchivePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ token?: string; actor?: string }>;
+  searchParams?: Promise<{ actor?: string }>;
 }) {
+  const { workspace, user, features } = await requireWorkspaceContext();
   const params = await searchParams;
-  const token = params?.token;
-  const store = getStore();
+  const store = getStore(workspace.id);
   const actorFilter = params?.actor ?? "all";
   const logs = (await store.listAuditLogs(200)).filter((entry) => {
     if (actorFilter === "system") return entry.actor?.startsWith("system:");
@@ -30,7 +31,6 @@ export default async function AuditArchivePage({
     `rounded-full border px-3 py-1 text-xs ${active ? "border-slate-500 bg-slate-800 text-white" : "border-slate-800 text-slate-300"}`;
   const makeFilterLink = (value: string) => {
     const nextParams = new URLSearchParams();
-    if (token) nextParams.set("token", token);
     if (value !== "all") nextParams.set("actor", value);
     const query = nextParams.toString();
     return query ? `/dashboard/audit?${query}` : "/dashboard/audit";
@@ -38,13 +38,14 @@ export default async function AuditArchivePage({
 
   return (
     <PageShell
-      token={token}
+      workspaceName={workspace.name}
+      isAdmin={user.isAdmin}
+      features={features}
       title="Audit archive"
       subtitle="Full audit trail for recent actions."
       actions={
         <Link
           href={withParams("/dashboard", {
-            token,
             actor: actorFilter === "all" ? undefined : actorFilter,
           })}
           className="rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 hover:border-slate-600"

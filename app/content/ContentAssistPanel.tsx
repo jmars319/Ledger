@@ -4,7 +4,7 @@ import { useState } from "react";
 
 type AssistMode = "sanitize" | "structure" | "summarize";
 
-export default function ContentAssistPanel({ id, token }: { id: string; token?: string }) {
+export default function ContentAssistPanel({ id }: { id: string }) {
   const [mode, setMode] = useState<AssistMode>("sanitize");
   const [preview, setPreview] = useState<{ before: unknown; after: unknown } | null>(null);
   const [suggested, setSuggested] = useState<Record<string, unknown> | null>(null);
@@ -15,7 +15,6 @@ export default function ContentAssistPanel({ id, token }: { id: string; token?: 
 
   const apiFetch = (url: string, init: RequestInit) => {
     const headers = new Headers(init.headers || {});
-    if (token) headers.set("x-admin-token", token);
     return fetch(url, { ...init, headers });
   };
 
