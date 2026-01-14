@@ -16,10 +16,7 @@ type Repo = {
   selected: boolean;
 };
 
-const authHeaders = (token?: string) =>
-  token ? { "x-admin-token": token } : undefined;
-
-export default function SettingsGitHubSummary({ token }: { token?: string }) {
+export default function SettingsGitHubSummary() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [selectedRepos, setSelectedRepos] = useState<Repo[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -27,16 +24,19 @@ export default function SettingsGitHubSummary({ token }: { token?: string }) {
 
   const load = useCallback(async () => {
     try {
-      const statusRes = await fetch("/api/github/status", {
-        headers: authHeaders(token),
-      });
+      setError(null);
+      const statusRes = await fetch("/api/github/status");
+      if (!statusRes.ok) {
+        setStatus({ connected: false });
+        setSelectedRepos([]);
+        setError("GitHub integration is disabled for this workspace.");
+        return;
+      }
       const statusBody = (await statusRes.json()) as StatusResponse;
       setStatus(statusBody);
 
       if (statusBody.connected) {
-        const reposRes = await fetch("/api/github/repos", {
-          headers: authHeaders(token),
-        });
+        const reposRes = await fetch("/api/github/repos");
         const reposBody = (await reposRes.json()) as { repos: Repo[] };
         const selected = (reposBody.repos ?? []).filter((repo) => repo.selected);
         setSelectedRepos(selected);
@@ -46,7 +46,7 @@ export default function SettingsGitHubSummary({ token }: { token?: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load GitHub status.");
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -81,7 +81,6 @@ export default function SettingsGitHubSummary({ token }: { token?: string }) {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",
-                      ...authHeaders(token),
                     },
                     body: JSON.stringify({ repoIds: selectedRepos.map((repo) => repo.repoId) }),
                   });

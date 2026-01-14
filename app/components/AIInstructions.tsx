@@ -12,6 +12,7 @@ type Props = {
   onReset: () => void;
   saveState: SaveState;
   usedTags: Set<string>;
+  canManage?: boolean;
 };
 
 type ModalState = {
@@ -37,6 +38,7 @@ export default function AIInstructions({
   onReset,
   saveState,
   usedTags,
+  canManage = true,
 }: Props) {
   const [modal, setModal] = useState<ModalState>(null);
 
@@ -101,24 +103,27 @@ export default function AIInstructions({
         <div>
           <div className="text-sm font-semibold text-slate-200">AI instructions</div>
           <div className="text-xs text-slate-500">
-            Local-only guidance for tone and hard rules. Stored in this browser.
+            Workspace-scoped guidance for tone and hard rules. Used by AI drafts.
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={addBrand}
+            disabled={!canManage}
             className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200"
           >
             Add brand
           </button>
           <button
             onClick={onReset}
+            disabled={!canManage}
             className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200"
           >
             Reset
           </button>
           <button
             onClick={onSave}
+            disabled={!canManage}
             className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200"
           >
             Save
@@ -144,15 +149,16 @@ export default function AIInstructions({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => openModal(entry)}
+                disabled={!canManage}
                 className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-200"
               >
                 Edit
               </button>
               <button
                 onClick={() => deleteBrand(entry)}
-                disabled={usedTags.has(entry.tag)}
+                disabled={usedTags.has(entry.tag) || !canManage}
                 className={`rounded-lg border px-3 py-1 text-xs ${
-                  usedTags.has(entry.tag)
+                  usedTags.has(entry.tag) || !canManage
                     ? "border-slate-800 text-slate-600"
                     : "border-slate-700 text-slate-200"
                 }`}
